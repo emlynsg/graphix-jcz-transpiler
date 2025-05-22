@@ -8,7 +8,7 @@ In the seminal paper [*The Measurement
 Calculus*](https://arxiv.org/abs/0704.1263) by Danos, Kashefi, and
 Panangaden (2007), circuit-to-pattern transpilation leverages the
 universality of the gate set consisting of 𝔍(α) and ∧Z. This package
-implements that transpilation mehtod in a straightforward and
+implements that transpilation method in a straightforward and
 principled way.
 
 The package allows for transpilation of circuits with the following steps:

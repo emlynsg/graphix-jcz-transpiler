@@ -12,7 +12,7 @@ from enum import Enum
 from math import pi
 from typing import TYPE_CHECKING, ClassVar, Literal
 
-import networkx as nx
+from networkx import Graph
 from graphix import Pattern, command, instruction
 from graphix.fundamentals import Plane
 from graphix.instruction import InstructionKind
@@ -404,7 +404,7 @@ def circuit_to_open_graph(circuit: Circuit) -> OpenGraph:
     n_nodes = circuit.width
     measurements: dict[int, Measurement] = {}
     inputs = list(range(n_nodes))
-    inside = nx.Graph()
+    inside = Graph()
     inside.add_nodes_from(inputs)
     for instr in circuit.instruction:
         if instr.kind == InstructionKind.M:

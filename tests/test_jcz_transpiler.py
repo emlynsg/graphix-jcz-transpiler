@@ -95,7 +95,7 @@ def test_measure(fx_rng: Generator) -> None:
     transpiled.pattern.minimize_space()
 
     def simulate_and_measure() -> int:
-        measure_method = DefaultMeasureMethod(results=transpiled.pattern.results)  # type: ignore[no-untyped-call]
+        measure_method = DefaultMeasureMethod(results=transpiled.pattern.results)
         state = transpiled.pattern.simulate_pattern(rng=fx_rng, measure_method=measure_method)
         measured = measure_method.get_measure_result(transpiled.classical_outputs[0])
         assert isinstance(state, Statevec)

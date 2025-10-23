@@ -12,15 +12,19 @@ from enum import Enum
 from math import pi
 from typing import TYPE_CHECKING, ClassVar, Literal
 
+import networkx as nx
 from graphix import Pattern, command, instruction
+from graphix.fundamentals import Plane
 from graphix.instruction import InstructionKind
+from graphix.measurements import Measurement
+from graphix.opengraph import OpenGraph
 from graphix.transpiler import Circuit, TranspileResult
 from typing_extensions import TypeAlias, assert_never
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
 
-    from graphix.parameters import ExpressionOrFloat
+    from graphix.parameter import ExpressionOrFloat
 
 
 class JCZInstructionKind(Enum):
@@ -133,6 +137,8 @@ def decompose_rzz(instr: instruction.RZZ) -> list[instruction.CNOT | instruction
 def decompose_cnot(instr: instruction.CNOT) -> list[instruction.H | CZ]:
     """Return a decomposition of the CNOT gate as H·∧z·H.
 
+    Vincent Danos, Elham Kashefi, Prakash Panangaden, The Measurement Calculus, 2007.
+
     Args:
     ----
         instr: the CNOT instruction to decompose.
@@ -151,6 +157,11 @@ def decompose_cnot(instr: instruction.CNOT) -> list[instruction.H | CZ]:
 
 def decompose_swap(instr: instruction.SWAP) -> list[instruction.CNOT]:
     """Return a decomposition of the SWAP gate as CNOT(0, 1)·CNOT(1, 0)·CNOT(0, 1).
+
+    Michael A. Nielsen and Isaac L. Chuang,
+    Quantum Computation and Quantum Information,
+    Cambridge University Press, 2000
+    (p. 23 in the 10th Anniversary Edition).
 
     Args:
     ----
@@ -370,3 +381,73 @@ def transpile_jcz(circuit: Circuit) -> TranspileResult:
             assert_never(instr_jcz.kind)
     pattern.reorder_output_nodes([i for i in indices if i is not None])
     return TranspileResult(pattern, tuple(classical_outputs))
+
+
+def circuit_to_open_graph(circuit: Circuit) -> OpenGraph:
+    """Transpile a circuit via a J-∧z-like decomposition to an open graph.
+
+    Args:
+    ----
+        circuit: the circuit to transpile.
+
+    Returns:
+    -------
+        the result of the transpilation: an open graph.
+
+    Raises:
+    ------
+        IllformedPatternError: if the pattern is ill-formed (operation on already measured node)
+        InternalInstructionError: if the circuit contains internal _XC or _ZC instructions.
+
+    """
+    indices: list[int | None] = list(range(circuit.width))
+    n_nodes = circuit.width
+    measurements: dict[int, Measurement] = {}
+    inputs = list(range(n_nodes))
+    inside = nx.Graph()
+    inside.add_nodes_from(inputs)
+    for instr in circuit.instruction:
+        if instr.kind == InstructionKind.M:
+            measurements[instr.target] = Measurement(instr.angle / pi, instr.plane)
+            indices[instr.target] = None
+            continue
+        # Use == for mypy
+        if instr.kind == InstructionKind._XC or instr.kind == InstructionKind._ZC:  # noqa: PLR1714, SLF001
+            raise InternalInstructionError(instr)
+        for instr_jcz in instruction_to_jcz(instr):
+            if instr_jcz.kind == JCZInstructionKind.J:
+                target = indices[instr_jcz.target]
+                if target is None:
+                    raise IllformedPatternError
+                ancilla = n_nodes
+                n_nodes += 1
+                inside.add_node(ancilla)
+                inside.add_edge(target, ancilla)
+                measurements[target] = Measurement(-instr_jcz.angle / pi, plane=Plane.XY)
+                indices[instr_jcz.target] = ancilla
+                continue
+            if instr_jcz.kind == JCZInstructionKind.CZ:
+                t0, t1 = instr_jcz.targets
+                i0, i1 = indices[t0], indices[t1]
+                if i0 is None or i1 is None:
+                    raise IllformedPatternError
+                inside.add_edge(i0, i1)
+                continue
+            assert_never(instr_jcz.kind)
+    outputs = sorted(set(inside.nodes) - set(measurements.keys()))
+    return OpenGraph(inside, measurements, inputs, outputs)
+
+
+def transpile_jcz_open_graph(circuit: Circuit) -> Pattern:
+    """Transpile a circuit via a J-∧z-like decomposition to a pattern.
+
+    Args:
+    ----
+        circuit: the circuit to transpile.
+
+    Returns:
+    -------
+        the result of the transpilation: a pattern.
+
+    """
+    return circuit_to_open_graph(circuit).to_pattern()

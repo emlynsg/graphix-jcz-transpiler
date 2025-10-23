@@ -404,7 +404,7 @@ def circuit_to_open_graph(circuit: Circuit) -> OpenGraph:
     n_nodes = circuit.width
     measurements: dict[int, Measurement] = {}
     inputs = list(range(n_nodes))
-    inside: nx.Graph = nx.Graph()  # mypy: disable-error-code="name-defined,attr-defined"
+    inside = nx.Graph()  # type: ignore[attr-defined]
     inside.add_nodes_from(inputs)
     for instr in circuit.instruction:
         if instr.kind == InstructionKind.M:

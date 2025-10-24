@@ -441,6 +441,8 @@ def circuit_to_open_graph(circuit: Circuit) -> OpenGraph:
 def transpile_jcz_open_graph(circuit: Circuit) -> Pattern:
     """Transpile a circuit via a J-∧z-like decomposition to a pattern.
 
+    Currently fails due to overuse of memory in conversion from open graph to pattern, assumed in the causal flow step.
+
     Args:
     ----
         circuit: the circuit to transpile.

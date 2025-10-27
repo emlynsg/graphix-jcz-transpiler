@@ -15,6 +15,8 @@ from typing import TYPE_CHECKING, ClassVar, Literal
 import networkx as nx
 from graphix import Pattern, command, instruction
 from graphix.fundamentals import Plane
+from graphix.generator import _gflow2pattern, _pflow2pattern  # noqa: PLC2701
+from graphix.gflow import find_gflow, find_pauliflow
 from graphix.instruction import InstructionKind
 from graphix.measurements import Measurement
 from graphix.opengraph import OpenGraph
@@ -452,4 +454,49 @@ def transpile_jcz_open_graph(circuit: Circuit) -> Pattern:
         the result of the transpilation: a pattern.
 
     """
-    return circuit_to_open_graph(circuit).to_pattern()
+    # return circuit_to_open_graph(circuit).to_pattern()
+    return open_graph_to_pattern_no_flow(circuit_to_open_graph(circuit))
+
+
+def open_graph_to_pattern_no_flow(og: OpenGraph) -> Pattern:
+    """Generate a pattern from an open graph using gflow- and pflow-finding algorithms.
+
+    Parameters
+    ----------
+    og: the open graph to generate the pattern from.
+
+    Returns
+    -------
+    the pattern generated from the open graph.
+
+    Raises
+    ------
+    ValueError: if the open graph does not have flow, gflow, or Pauli flow
+
+    """
+    g = og.inside.copy()
+    inputs = og.inputs
+    outputs = og.outputs
+    meas = og.measurements
+    angles = {node: m.angle for node, m in meas.items()}
+    planes = {node: m.plane for node, m in meas.items()}
+    inputs_set = set(og.inputs)
+    outputs_set = set(og.outputs)
+    measuring_nodes = set(g.nodes) - outputs_set
+    meas_planes = dict.fromkeys(measuring_nodes, Plane.XY) if not planes else dict(planes)
+    # gflow first
+    gflow, l_k = find_gflow(g, inputs_set, outputs_set, meas_planes=meas_planes)
+    if gflow is not None:
+        # gflow found
+        pattern = _gflow2pattern(g, angles, inputs, meas_planes, gflow, l_k)
+        pattern.reorder_output_nodes(outputs)
+        return pattern
+    # then pflow
+    pflow, l_k = find_pauliflow(g, inputs_set, outputs_set, meas_planes=meas_planes, meas_angles=angles)
+    if pflow is not None:
+        # pflow found
+        pattern = _pflow2pattern(g, angles, inputs, meas_planes, pflow, l_k)
+        pattern.reorder_output_nodes(outputs)
+        return pattern
+    msg = "no flow or gflow or pflow found"
+    raise ValueError(msg)

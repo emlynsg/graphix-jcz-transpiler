@@ -21,3 +21,6 @@ implementation is more naive but also more transparent:
 
 - Further optimization is possible via standard techniques such as
   Pauli pre-simulation, and space or depth minimization.
+
+Todo:
+ - [ ] Correct functionality with CCX gate

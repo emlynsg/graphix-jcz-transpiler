@@ -53,7 +53,9 @@ def test_circuit_simulation(circuit: Circuit, fx_rng: Generator) -> None:
 def test_circuit_simulation_og(circuit: Circuit, fx_rng: Generator) -> None:
     """Test circuit transpilation comparing state vector back-end with open graph transpilation."""
     pattern = transpile_jcz(circuit).pattern
+    pattern.minimize_space()
     pattern_og = transpile_jcz_open_graph(circuit)
+    pattern_og.minimize_space()
     state_mbqc = pattern.simulate_pattern(rng=fx_rng)
     state_mbqc_og = pattern_og.simulate_pattern(rng=fx_rng)
     assert np.abs(np.dot(state_mbqc.flatten().conjugate(), state_mbqc_og.flatten())) == pytest.approx(1)

@@ -26,6 +26,9 @@ jobs:
       - name: Setup requirements
         run: pip install -r requirements.txt -r requirements-dev.txt
 
+      - name: Run pytest
+        run: pytest
+        
       - name: Run ruff-check
         run: ruff check
 
@@ -34,6 +37,3 @@ jobs:
 
       - name: Run mypy
         run: mypy .
-
-      - name: Run pytest
-        run: pytest

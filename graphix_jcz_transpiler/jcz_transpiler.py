@@ -363,14 +363,7 @@ def transpile_jcz(circuit: Circuit) -> TranspileResult:
                     raise IllformedPatternError
                 ancilla = n_nodes
                 n_nodes += 1
-                pattern.extend(
-                    [
-                        command.N(node=ancilla),
-                        command.E(nodes=(target, ancilla)),
-                        command.M(node=target, angle=-instr_jcz.angle / pi),
-                        command.X(node=ancilla, domain={target}),
-                    ],
-                )
+                pattern.extend(j_commands(target, ancilla, -instr_jcz.angle))
                 indices[instr_jcz.target] = ancilla
                 continue
             if instr_jcz.kind == JCZInstructionKind.CZ:
@@ -383,6 +376,29 @@ def transpile_jcz(circuit: Circuit) -> TranspileResult:
             assert_never(instr_jcz.kind)
     pattern.reorder_output_nodes([i for i in indices if i is not None])
     return TranspileResult(pattern, tuple(classical_outputs))
+
+
+def j_commands(current_node: int, next_node: int, angle: ExpressionOrFloat) -> list[command.Command]:
+    """Return the MBQC pattern commands for a J gate.
+
+    Args:
+    ----
+        current_node: the current node.
+        next_node: the next node.
+        angle: the angle of the J gate.
+        domain: the domain the X correction is based on.
+
+    Returns:
+    -------
+        the MBQC pattern commands for a J gate as a list
+
+    """
+    return [
+            command.N(node=next_node),
+            command.E(nodes=(current_node, next_node)),
+            command.M(node=current_node, angle=angle / pi),
+            command.X(node=next_node, domain={current_node}),
+            ]
 
 
 def circuit_to_open_graph(circuit: Circuit) -> OpenGraph:

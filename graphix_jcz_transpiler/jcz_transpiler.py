@@ -24,7 +24,7 @@ from graphix.transpiler import Circuit, TranspileResult
 from typing_extensions import TypeAlias, assert_never
 
 if TYPE_CHECKING:
-    from collections.abc import Iterable
+    from collections.abc import Iterable, Sequence
 
     from graphix.parameter import ExpressionOrFloat
 
@@ -80,7 +80,7 @@ JCZInstruction: TypeAlias = (
 
 def decompose_ccx(
     instr: instruction.CCX,
-) -> list[instruction.H | instruction.CNOT | instruction.RZ]:
+) -> Sequence[instruction.H | instruction.CNOT | instruction.RZ]:
     """Return a decomposition of the CCX gate into H, CNOT, T and T-dagger gates.
 
     This decomposition of the Toffoli gate can be found in
@@ -117,7 +117,7 @@ def decompose_ccx(
     ]
 
 
-def decompose_rzz(instr: instruction.RZZ) -> list[instruction.CNOT | instruction.RZ]:
+def decompose_rzz(instr: instruction.RZZ) -> Sequence[instruction.CNOT | instruction.RZ]:
     """Return a decomposition of RZZ(α) gate as CNOT(control, target)·Rz(target, α)·CNOT(control, target).
 
     Args:
@@ -136,7 +136,7 @@ def decompose_rzz(instr: instruction.RZZ) -> list[instruction.CNOT | instruction
     ]
 
 
-def decompose_cnot(instr: instruction.CNOT) -> list[instruction.H | CZ]:
+def decompose_cnot(instr: instruction.CNOT) -> Sequence[instruction.H | CZ]:
     """Return a decomposition of the CNOT gate as H·∧z·H.
 
     Vincent Danos, Elham Kashefi, Prakash Panangaden, The Measurement Calculus, 2007.
@@ -157,7 +157,7 @@ def decompose_cnot(instr: instruction.CNOT) -> list[instruction.H | CZ]:
     ]
 
 
-def decompose_swap(instr: instruction.SWAP) -> list[instruction.CNOT]:
+def decompose_swap(instr: instruction.SWAP) -> Sequence[instruction.CNOT]:
     """Return a decomposition of the SWAP gate as CNOT(0, 1)·CNOT(1, 0)·CNOT(0, 1).
 
     Michael A. Nielsen and Isaac L. Chuang,
@@ -181,7 +181,7 @@ def decompose_swap(instr: instruction.SWAP) -> list[instruction.CNOT]:
     ]
 
 
-def decompose_y(instr: instruction.Y) -> Iterable[instruction.X | instruction.Z]:
+def decompose_y(instr: instruction.Y) -> Sequence[instruction.X | instruction.Z]:
     """Return a decomposition of the Y gate as X·Z.
 
     Args:
@@ -193,10 +193,10 @@ def decompose_y(instr: instruction.Y) -> Iterable[instruction.X | instruction.Z]
         the decomposition.
 
     """
-    return reversed([instruction.X(instr.target), instruction.Z(instr.target)])
+    return list(reversed([instruction.X(instr.target), instruction.Z(instr.target)]))
 
 
-def decompose_rx(instr: instruction.RX) -> list[J]:
+def decompose_rx(instr: instruction.RX) -> Sequence[J]:
     """Return a J decomposition of the RX gate.
 
     The Rx(α) gate is decomposed into J(α)·H (that is to say, J(α)·J(0)).
@@ -214,7 +214,7 @@ def decompose_rx(instr: instruction.RX) -> list[J]:
     return [J(target=instr.target, angle=angle) for angle in reversed((instr.angle, 0))]
 
 
-def decompose_ry(instr: instruction.RY) -> list[J]:
+def decompose_ry(instr: instruction.RY) -> Sequence[J]:
     """Return a J decomposition of the RY gate.
 
     The Ry(α) gate is decomposed into J(0)·J(π/2)·J(α)·J(-π/2).
@@ -233,7 +233,7 @@ def decompose_ry(instr: instruction.RY) -> list[J]:
     return [J(target=instr.target, angle=angle) for angle in reversed((0, pi / 2, instr.angle, -pi / 2))]
 
 
-def decompose_rz(instr: instruction.RZ) -> Iterable[J]:
+def decompose_rz(instr: instruction.RZ) -> Sequence[J]:
     """Return a J decomposition of the RZ gate.
 
     The Rz(α) gate is decomposed into H·J(α) (that is to say, J(0)·J(α)).
@@ -251,7 +251,7 @@ def decompose_rz(instr: instruction.RZ) -> Iterable[J]:
     return [J(target=instr.target, angle=angle) for angle in reversed((0, instr.angle))]
 
 
-def instruction_to_jcz(instr: JCZInstruction) -> Iterable[J | CZ]:
+def instruction_to_jcz(instr: JCZInstruction) -> Sequence[J | CZ]:
     """Return a J-∧z decomposition of the instruction.
 
     Args:
@@ -295,7 +295,7 @@ def instruction_to_jcz(instr: JCZInstruction) -> Iterable[J | CZ]:
     assert_never(instr.kind)
 
 
-def instruction_list_to_jcz(instrs: Iterable[JCZInstruction]) -> list[J | CZ]:
+def instruction_list_to_jcz(instrs: Sequence[JCZInstruction]) -> list[J | CZ]:
     """Return a J-∧z decomposition of the sequence of instructions.
 
     Args:

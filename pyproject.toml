@@ -2,8 +2,8 @@
 name = "graphix_jcz_transpiler"
 version = "1"
 
-[tool.setuptools]
-packages = ["graphix_jcz_transpiler"]
+[tool.setuptools.packages.find]
+include = ["graphix_jcz_transpiler"]
 
 [tool.ruff]
 line-length = 120

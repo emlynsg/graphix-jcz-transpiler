@@ -5,6 +5,8 @@ Copyright (C) 2025, QAT team (ENS-PSL, Inria, CNRS).
 
 from graphix_jcz_transpiler.jcz_transpiler import (
     CZ,
+    IllformedPatternError,
+    InternalInstructionError,
     J,
     decompose_ccx,
     decompose_rx,
@@ -18,5 +20,19 @@ from graphix_jcz_transpiler.jcz_transpiler import (
     transpile_jcz_open_graph,
 )
 
-__all__ = ["CZ", "J", "decompose_ccx", "decompose_rx", "decompose_ry", "decompose_rz", "decompose_rzz",
-           "decompose_swap", "decompose_y", "j_commands", "transpile_jcz", "transpile_jcz_open_graph"]
+__all__ = [
+    "CZ",
+    "IllformedPatternError",
+    "InternalInstructionError",
+    "J",
+    "decompose_ccx",
+    "decompose_rx",
+    "decompose_ry",
+    "decompose_rz",
+    "decompose_rzz",
+    "decompose_swap",
+    "decompose_y",
+    "j_commands",
+    "transpile_jcz",
+    "transpile_jcz_open_graph",
+]

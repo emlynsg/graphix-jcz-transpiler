@@ -324,6 +324,29 @@ class InternalInstructionError(Exception):
         super().__init__(f"Internal instruction: {instr}")
 
 
+def j_commands(current_node: int, next_node: int, angle: ExpressionOrFloat) -> list[command.Command]:
+    """Return the MBQC pattern commands for a J gate.
+
+    Args:
+    ----
+        current_node: the current node.
+        next_node: the next node.
+        angle: the angle of the J gate.
+        domain: the domain the X correction is based on.
+
+    Returns:
+    -------
+        the MBQC pattern commands for a J gate as a list
+
+    """
+    return [
+            command.N(node=next_node),
+            command.E(nodes=(current_node, next_node)),
+            command.M(node=current_node, angle=angle / pi),
+            command.X(node=next_node, domain={current_node}),
+            ]
+
+
 def transpile_jcz(circuit: Circuit) -> TranspileResult:
     """Transpile a circuit via a J-∧z decomposition.
 
@@ -374,29 +397,6 @@ def transpile_jcz(circuit: Circuit) -> TranspileResult:
             assert_never(instr_jcz.kind)
     pattern.reorder_output_nodes([i for i in indices if i is not None])
     return TranspileResult(pattern, tuple(classical_outputs))
-
-
-def j_commands(current_node: int, next_node: int, angle: ExpressionOrFloat) -> list[command.Command]:
-    """Return the MBQC pattern commands for a J gate.
-
-    Args:
-    ----
-        current_node: the current node.
-        next_node: the next node.
-        angle: the angle of the J gate.
-        domain: the domain the X correction is based on.
-
-    Returns:
-    -------
-        the MBQC pattern commands for a J gate as a list
-
-    """
-    return [
-            command.N(node=next_node),
-            command.E(nodes=(current_node, next_node)),
-            command.M(node=current_node, angle=angle / pi),
-            command.X(node=next_node, domain={current_node}),
-            ]
 
 
 def circuit_to_open_graph(circuit: Circuit) -> OpenGraph:

@@ -17,7 +17,6 @@ from graphix_jcz_transpiler.jcz_transpiler import (
     decompose_y,
     j_commands,
     transpile_jcz,
-    transpile_jcz_open_graph,
 )
 
 __all__ = [
@@ -34,5 +33,4 @@ __all__ = [
     "decompose_y",
     "j_commands",
     "transpile_jcz",
-    "transpile_jcz_open_graph",
 ]

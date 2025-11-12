@@ -20,7 +20,7 @@ from graphix.simulator import DefaultMeasureMethod
 from graphix.transpiler import Circuit
 from numpy.random import PCG64, Generator
 
-from graphix_jcz_transpiler import transpile_jcz, transpile_jcz_open_graph
+from graphix_jcz_transpiler import transpile_jcz
 
 logger = logging.getLogger(__name__)
 
@@ -47,18 +47,6 @@ def test_circuit_simulation(circuit: Circuit, fx_rng: Generator) -> None:
     state = circuit.simulate_statevector().statevec
     state_mbqc = pattern.simulate_pattern(rng=fx_rng)
     assert np.abs(np.dot(state_mbqc.flatten().conjugate(), state.flatten())) == pytest.approx(1)
-
-
-@pytest.mark.parametrize("circuit", TEST_BASIC_CIRCUITS)
-def test_circuit_simulation_og(circuit: Circuit, fx_rng: Generator) -> None:
-    """Test circuit transpilation comparing state vector back-end with open graph transpilation."""
-    pattern = transpile_jcz(circuit).pattern
-    pattern.minimize_space()
-    pattern_og = transpile_jcz_open_graph(circuit)
-    pattern_og.minimize_space()
-    state_mbqc = pattern.simulate_pattern(rng=fx_rng)
-    state_mbqc_og = pattern_og.simulate_pattern(rng=fx_rng)
-    assert np.abs(np.dot(state_mbqc.flatten().conjugate(), state_mbqc_og.flatten())) == pytest.approx(1)
 
 
 @pytest.mark.parametrize("circuit", TEST_BASIC_CIRCUITS)

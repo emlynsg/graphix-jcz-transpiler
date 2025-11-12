@@ -5,6 +5,7 @@ Copyright (C) 2025, QAT team (ENS-PSL, Inria, CNRS).
 
 from graphix_jcz_transpiler.jcz_transpiler import (
     CZ,
+    InternalInstructionError,
     J,
     JCZInstructionKind,
     decompose_ccx,
@@ -21,6 +22,7 @@ from graphix_jcz_transpiler.jcz_transpiler import (
 
 __all__ = [
     "CZ",
+    "InternalInstructionError",
     "J",
     "JCZInstructionKind",
     "decompose_ccx",

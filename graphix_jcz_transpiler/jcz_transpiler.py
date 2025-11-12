@@ -342,7 +342,7 @@ def j_commands(current_node: int, next_node: int, angle: ExpressionOrFloat) -> l
     return [
             command.N(node=next_node),
             command.E(nodes=(current_node, next_node)),
-            command.M(node=current_node, angle=angle / pi),
+            command.M(node=current_node, angle=(angle / pi) + 0.0),
             command.X(node=next_node, domain={current_node}),
             ]
 

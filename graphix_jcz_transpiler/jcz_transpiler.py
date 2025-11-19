@@ -289,7 +289,7 @@ def instruction_to_jcz(instr: JCZInstruction) -> Sequence[J | CZ]:
     assert_never(instr.kind)
 
 
-def instruction_list_to_jcz(instrs: Sequence[JCZInstruction]) -> list[J | CZ]:
+def instruction_list_to_jcz(instrs: Sequence[JCZInstruction]) -> Sequence[J | CZ]:
     """Return a J-∧z decomposition of the sequence of instructions.
 
     Args:
@@ -320,7 +320,7 @@ class InternalInstructionError(Exception):
         super().__init__(f"Internal instruction: {instr}")
 
 
-def j_commands(current_node: int, next_node: int, angle: ExpressionOrFloat) -> list[command.Command]:
+def j_commands(current_node: int, next_node: int, angle: ExpressionOrFloat) -> Sequence[command.Command]:
     """Return the MBQC pattern commands for a J gate.
 
     Args:
@@ -336,11 +336,11 @@ def j_commands(current_node: int, next_node: int, angle: ExpressionOrFloat) -> l
 
     """
     return [
-            command.N(node=next_node),
-            command.E(nodes=(current_node, next_node)),
-            command.M(node=current_node, angle=(angle / pi) + 0.0),
-            command.X(node=next_node, domain={current_node}),
-            ]
+        command.N(node=next_node),
+        command.E(nodes=(current_node, next_node)),
+        command.M(node=current_node, angle=(angle / pi) + 0.0),  # Avoids -0.0
+        command.X(node=next_node, domain={current_node}),
+    ]
 
 
 def transpile_jcz(circuit: Circuit) -> TranspileResult:

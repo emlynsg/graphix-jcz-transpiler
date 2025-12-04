@@ -22,7 +22,7 @@ from graphix.transpiler import Circuit, TranspileResult
 from typing_extensions import TypeAlias, assert_never
 
 if TYPE_CHECKING:
-    from collections.abc import Sequence
+    from collections.abc import Iterable, Sequence
 
     from graphix.parameter import ExpressionOrFloat
 
@@ -249,7 +249,7 @@ def decompose_rz(instr: instruction.RZ) -> list[J]:
     return [J(target=instr.target, angle=angle) for angle in reversed((0, instr.angle))]
 
 
-def instruction_to_jcz(instr: JCZInstruction) -> list[J | CZ]:
+def instruction_to_jcz(instr: JCZInstruction) -> Sequence[J | CZ]:
     """Return a J-∧z decomposition of the instruction.
 
     Args:
@@ -293,7 +293,7 @@ def instruction_to_jcz(instr: JCZInstruction) -> list[J | CZ]:
     assert_never(instr.kind)
 
 
-def instruction_list_to_jcz(instrs: list[JCZInstruction]) -> list[J | CZ]:
+def instruction_list_to_jcz(instrs: Iterable[JCZInstruction]) -> list[J | CZ]:
     """Return a J-∧z decomposition of the sequence of instructions.
 
     Args:
@@ -407,7 +407,7 @@ def transpile_jcz(circuit: Circuit) -> TranspileResult:
     return TranspileResult(pattern, tuple(classical_outputs))
 
 
-def circuit_to_open_graph(circuit: Circuit) -> OpenGraph:
+def circuit_to_open_graph(circuit: Circuit) -> OpenGraph[Measurement]:
     """Transpile a circuit via a J-∧z-like decomposition to an open graph.
 
     Args:
@@ -429,7 +429,7 @@ def circuit_to_open_graph(circuit: Circuit) -> OpenGraph:
     n_nodes = circuit.width
     measurements: dict[int, Measurement] = {}
     inputs = list(range(n_nodes))
-    graph = nx.Graph()  # type: ignore[attr-defined]
+    graph: nx.Graph[int] = nx.Graph()
     graph.add_nodes_from(inputs)
     for instr in circuit.instruction:
         if instr.kind == InstructionKind.M:

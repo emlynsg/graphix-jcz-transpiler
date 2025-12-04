@@ -458,7 +458,7 @@ def circuit_to_open_graph(circuit: Circuit) -> OpenGraph:
                 continue
             assert_never(instr_jcz.kind)
     outputs = [i for i in indices if i is not None]
-    return OpenGraph(graph, measurements, inputs, outputs)
+    return OpenGraph(graph, inputs, outputs, measurements)
 
 
 def transpile_jcz_open_graph(circuit: Circuit) -> TranspileResult:

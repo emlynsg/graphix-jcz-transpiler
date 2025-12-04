@@ -8,6 +8,7 @@ from graphix_jcz_transpiler.jcz_transpiler import (
     InternalInstructionError,
     J,
     JCZInstructionKind,
+    circuit_to_open_graph,
     decompose_ccx,
     decompose_rx,
     decompose_ry,
@@ -17,6 +18,7 @@ from graphix_jcz_transpiler.jcz_transpiler import (
     decompose_y,
     j_commands,
     transpile_jcz,
+    transpile_jcz_open_graph,
 )
 
 __all__ = [
@@ -24,6 +26,7 @@ __all__ = [
     "InternalInstructionError",
     "J",
     "JCZInstructionKind",
+    "circuit_to_open_graph",
     "decompose_ccx",
     "decompose_rx",
     "decompose_ry",
@@ -33,4 +36,5 @@ __all__ = [
     "decompose_y",
     "j_commands",
     "transpile_jcz",
+    "transpile_jcz_open_graph",
 ]

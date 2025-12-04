@@ -11,6 +11,14 @@ universality of the gate set consisting of 𝔍(α) and ∧Z. This package
 implements that transpilation mehtod in a straightforward and
 principled way.
 
+The package allows for transpilation of circuits with the following steps:
+
+1. Convert circuit, defined by gates available in Graphix, to a set of J and ∧z gates.
+
+2. Construct an open graph from the J and ∧z gates.
+
+3. Find a flow for the open graph and convert it into a pattern.
+
 Compared to the existing transpilation procedure in Graphix, this
 implementation is more naive but also more transparent:
 

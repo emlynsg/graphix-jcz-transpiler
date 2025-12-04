@@ -12,8 +12,12 @@ from enum import Enum
 from math import pi
 from typing import TYPE_CHECKING, ClassVar, Literal
 
+import networkx as nx
 from graphix import Pattern, command, instruction
+from graphix.fundamentals import Plane
 from graphix.instruction import InstructionKind
+from graphix.measurements import Measurement
+from graphix.opengraph import OpenGraph
 from graphix.transpiler import Circuit, TranspileResult
 from typing_extensions import TypeAlias, assert_never
 
@@ -74,7 +78,7 @@ JCZInstruction: TypeAlias = (
 
 def decompose_ccx(
     instr: instruction.CCX,
-) -> Sequence[instruction.H | instruction.CNOT | instruction.RZ]:
+) -> list[instruction.H | instruction.CNOT | instruction.RZ]:
     """Return a decomposition of the CCX gate into H, CNOT, T and T-dagger gates.
 
     This decomposition of the Toffoli gate can be found in
@@ -111,7 +115,7 @@ def decompose_ccx(
     ]
 
 
-def decompose_rzz(instr: instruction.RZZ) -> Sequence[instruction.CNOT | instruction.RZ]:
+def decompose_rzz(instr: instruction.RZZ) -> list[instruction.CNOT | instruction.RZ]:
     """Return a decomposition of RZZ(α) gate as CNOT(control, target)·Rz(target, α)·CNOT(control, target).
 
     Args:
@@ -124,13 +128,13 @@ def decompose_rzz(instr: instruction.RZZ) -> Sequence[instruction.CNOT | instruc
 
     """
     return [
-        instruction.CNOT(control=instr.control, target=instr.target),
+        instruction.CNOT(target=instr.target, control=instr.control),
         instruction.RZ(instr.target, instr.angle),
-        instruction.CNOT(control=instr.control, target=instr.target),
+        instruction.CNOT(target=instr.target, control=instr.control),
     ]
 
 
-def decompose_cnot(instr: instruction.CNOT) -> Sequence[instruction.H | CZ]:
+def decompose_cnot(instr: instruction.CNOT) -> list[instruction.H | CZ]:
     """Return a decomposition of the CNOT gate as H·∧z·H.
 
     Vincent Danos, Elham Kashefi, Prakash Panangaden, The Measurement Calculus, 2007.
@@ -151,7 +155,7 @@ def decompose_cnot(instr: instruction.CNOT) -> Sequence[instruction.H | CZ]:
     ]
 
 
-def decompose_swap(instr: instruction.SWAP) -> Sequence[instruction.CNOT]:
+def decompose_swap(instr: instruction.SWAP) -> list[instruction.CNOT]:
     """Return a decomposition of the SWAP gate as CNOT(0, 1)·CNOT(1, 0)·CNOT(0, 1).
 
     Michael A. Nielsen and Isaac L. Chuang,
@@ -175,7 +179,7 @@ def decompose_swap(instr: instruction.SWAP) -> Sequence[instruction.CNOT]:
     ]
 
 
-def decompose_y(instr: instruction.Y) -> Sequence[instruction.X | instruction.Z]:
+def decompose_y(instr: instruction.Y) -> list[instruction.X | instruction.Z]:
     """Return a decomposition of the Y gate as X·Z.
 
     Args:
@@ -190,7 +194,7 @@ def decompose_y(instr: instruction.Y) -> Sequence[instruction.X | instruction.Z]
     return list(reversed([instruction.X(instr.target), instruction.Z(instr.target)]))
 
 
-def decompose_rx(instr: instruction.RX) -> Sequence[J]:
+def decompose_rx(instr: instruction.RX) -> list[J]:
     """Return a J decomposition of the RX gate.
 
     The Rx(α) gate is decomposed into J(α)·H (that is to say, J(α)·J(0)).
@@ -208,7 +212,7 @@ def decompose_rx(instr: instruction.RX) -> Sequence[J]:
     return [J(target=instr.target, angle=angle) for angle in reversed((instr.angle, 0))]
 
 
-def decompose_ry(instr: instruction.RY) -> Sequence[J]:
+def decompose_ry(instr: instruction.RY) -> list[J]:
     """Return a J decomposition of the RY gate.
 
     The Ry(α) gate is decomposed into J(0)·J(π/2)·J(α)·J(-π/2).
@@ -227,7 +231,7 @@ def decompose_ry(instr: instruction.RY) -> Sequence[J]:
     return [J(target=instr.target, angle=angle) for angle in reversed((0, pi / 2, instr.angle, -pi / 2))]
 
 
-def decompose_rz(instr: instruction.RZ) -> Sequence[J]:
+def decompose_rz(instr: instruction.RZ) -> list[J]:
     """Return a J decomposition of the RZ gate.
 
     The Rz(α) gate is decomposed into H·J(α) (that is to say, J(0)·J(α)).
@@ -245,7 +249,7 @@ def decompose_rz(instr: instruction.RZ) -> Sequence[J]:
     return [J(target=instr.target, angle=angle) for angle in reversed((0, instr.angle))]
 
 
-def instruction_to_jcz(instr: JCZInstruction) -> Sequence[J | CZ]:
+def instruction_to_jcz(instr: JCZInstruction) -> list[J | CZ]:
     """Return a J-∧z decomposition of the instruction.
 
     Args:
@@ -289,7 +293,7 @@ def instruction_to_jcz(instr: JCZInstruction) -> Sequence[J | CZ]:
     assert_never(instr.kind)
 
 
-def instruction_list_to_jcz(instrs: Sequence[JCZInstruction]) -> Sequence[J | CZ]:
+def instruction_list_to_jcz(instrs: list[JCZInstruction]) -> list[J | CZ]:
     """Return a J-∧z decomposition of the sequence of instructions.
 
     Args:
@@ -304,12 +308,20 @@ def instruction_list_to_jcz(instrs: Sequence[JCZInstruction]) -> Sequence[J | CZ
     return [jcz_instr for instr in instrs for jcz_instr in instruction_to_jcz(instr)]
 
 
-class IllformedPatternError(Exception):
+class IllformedCircuitError(Exception):
     """Raised if the circuit is ill-formed."""
 
     def __init__(self) -> None:
         """Build the exception."""
         super().__init__("Ill-formed pattern")
+
+
+class CircuitWithMeasurementError(Exception):
+    """Raised if the circuit contains measurements."""
+
+    def __init__(self) -> None:
+        """Build the exception."""
+        super().__init__("Circuits containing measurements are not supported by the transpiler.")
 
 
 class InternalInstructionError(Exception):
@@ -320,7 +332,7 @@ class InternalInstructionError(Exception):
         super().__init__(f"Internal instruction: {instr}")
 
 
-def j_commands(current_node: int, next_node: int, angle: ExpressionOrFloat) -> Sequence[command.Command]:
+def j_commands(current_node: int, next_node: int, angle: ExpressionOrFloat) -> list[command.Command]:
     """Return the MBQC pattern commands for a J gate.
 
     Args:
@@ -357,7 +369,7 @@ def transpile_jcz(circuit: Circuit) -> TranspileResult:
     Raises:
     ------
         InternalInstructionError: if the circuit contains internal _XC or _ZC instructions.
-        IllformedPatternError: if the circuit has underdefined instructions.
+        IllformedCircuitError: if the circuit has underdefined instructions.
 
     """
     indices: list[int | None] = list(range(circuit.width))
@@ -377,7 +389,7 @@ def transpile_jcz(circuit: Circuit) -> TranspileResult:
             if instr_jcz.kind == JCZInstructionKind.J:
                 target = indices[instr_jcz.target]
                 if target is None:
-                    raise IllformedPatternError
+                    raise IllformedCircuitError
                 ancilla = n_nodes
                 n_nodes += 1
                 pattern.extend(j_commands(target, ancilla, -instr_jcz.angle))
@@ -387,9 +399,81 @@ def transpile_jcz(circuit: Circuit) -> TranspileResult:
                 t0, t1 = instr_jcz.targets
                 i0, i1 = indices[t0], indices[t1]
                 if i0 is None or i1 is None:
-                    raise IllformedPatternError
+                    raise IllformedCircuitError
                 pattern.extend([command.E(nodes=(i0, i1))])
                 continue
             assert_never(instr_jcz.kind)
     pattern.reorder_output_nodes([i for i in indices if i is not None])
     return TranspileResult(pattern, tuple(classical_outputs))
+
+
+def circuit_to_open_graph(circuit: Circuit) -> OpenGraph:
+    """Transpile a circuit via a J-∧z-like decomposition to an open graph.
+
+    Args:
+    ----
+        circuit: the circuit to transpile.
+
+    Returns:
+    -------
+        the result of the transpilation: an open graph.
+
+    Raises:
+    ------
+        IllformedCircuitError: if the pattern is ill-formed (operation on already measured node)
+        InternalInstructionError: if the circuit contains internal _XC or _ZC instructions.
+        CircuitWithMeasurementError: if the circuit contains measurements.
+
+    """
+    indices: list[int | None] = list(range(circuit.width))
+    n_nodes = circuit.width
+    measurements: dict[int, Measurement] = {}
+    inputs = list(range(n_nodes))
+    graph = nx.Graph()  # type: ignore[attr-defined]
+    graph.add_nodes_from(inputs)
+    for instr in circuit.instruction:
+        if instr.kind == InstructionKind.M:
+            raise CircuitWithMeasurementError
+        # Use == for mypy
+        if instr.kind == InstructionKind._XC or instr.kind == InstructionKind._ZC:  # noqa: PLR1714, SLF001
+            raise InternalInstructionError(instr)
+        for instr_jcz in instruction_to_jcz(instr):
+            if instr_jcz.kind == JCZInstructionKind.J:
+                target = indices[instr_jcz.target]
+                if target is None:
+                    raise IllformedCircuitError
+                ancilla = n_nodes
+                n_nodes += 1
+                graph.add_node(ancilla)
+                graph.add_edge(target, ancilla)
+                measurements[target] = Measurement(-instr_jcz.angle / pi, plane=Plane.XY)
+                indices[instr_jcz.target] = ancilla
+                continue
+            if instr_jcz.kind == JCZInstructionKind.CZ:
+                t0, t1 = instr_jcz.targets
+                i0, i1 = indices[t0], indices[t1]
+                if i0 is None or i1 is None:
+                    raise IllformedCircuitError
+                graph.add_edge(i0, i1)
+                continue
+            assert_never(instr_jcz.kind)
+    outputs = [i for i in indices if i is not None]
+    return OpenGraph(graph, measurements, inputs, outputs)
+
+
+def transpile_jcz_open_graph(circuit: Circuit) -> TranspileResult:
+    """Transpile a circuit via a J-∧z-like decomposition to a pattern.
+
+    Currently fails due to overuse of memory in conversion from open graph to pattern, assumed in the causal flow step.
+
+    Args:
+    ----
+        circuit: the circuit to transpile.
+
+    Returns:
+    -------
+        the result of the transpilation: a pattern.
+
+    """
+    og = circuit_to_open_graph(circuit)
+    return TranspileResult(og.to_pattern(), tuple(og.measurements.keys()))

@@ -53,9 +53,9 @@ def test_circuit_simulation(circuit: Circuit, fx_rng: Generator) -> None:
 def test_circuit_flow(circuit: Circuit) -> None:
     """Test transpiled circuits have flow."""
     pattern = transpile_jcz(circuit).pattern
-    og = OpenGraph.from_pattern(pattern)
+    og = pattern.extract_opengraph()
     f, _layers = find_flow(
-        og.inside, set(og.inputs), set(og.outputs), {node: meas.plane for node, meas in og.measurements.items()}
+        og.graph, set(og.input_nodes), set(og.output_nodes), {node: meas.plane for node, meas in og.measurements.items()}
     )
     assert f is not None
 
@@ -102,7 +102,9 @@ def test_measure(fx_rng: Generator) -> None:
 def test_circuit_simulation_og(circuit: Circuit, fx_rng: Generator) -> None:
     """Test circuit transpilation comparing state vector back-end."""
     pattern = transpile_jcz_open_graph(circuit).pattern
-    pattern.perform_pauli_measurements()
+    ## Pauli preprocessing can break the flow and minimize_space does not work well when there is no flow
+    ## Issues graphix#157 and graphix#363
+    # pattern.perform_pauli_measurements()
     pattern.minimize_space()
     state = circuit.simulate_statevector().statevec
     state_mbqc = pattern.simulate_pattern(rng=fx_rng)
@@ -113,9 +115,9 @@ def test_circuit_simulation_og(circuit: Circuit, fx_rng: Generator) -> None:
 def test_circuit_flow_og(circuit: Circuit) -> None:
     """Test transpiled circuits have flow."""
     pattern = transpile_jcz_open_graph(circuit).pattern
-    og = OpenGraph.from_pattern(pattern)
+    og = pattern.extract_opengraph()
     f, _layers = find_flow(
-        og.inside, set(og.inputs), set(og.outputs), {node: meas.plane for node, meas in og.measurements.items()}
+        og.graph, set(og.input_nodes), set(og.output_nodes), {node: meas.plane for node, meas in og.measurements.items()}
     )
     assert f is not None
 
@@ -124,11 +126,11 @@ def test_circuit_flow_og(circuit: Circuit) -> None:
 def test_og_generation(circuit: Circuit) -> None:
     """Test that open graphs are extracted in the expected way."""
     pattern = transpile_jcz(circuit).pattern
-    og = OpenGraph.from_pattern(pattern)
+    og = pattern.extract_opengraph()
     og_jcz = circuit_to_open_graph(circuit)
     assert og.measurements == og_jcz.measurements
-    assert og.inputs == og_jcz.inputs
-    assert og.outputs == og_jcz.outputs
+    assert og.input_nodes == og_jcz.input_nodes
+    assert og.output_nodes == og_jcz.output_nodes
 
 
 @pytest.mark.parametrize("circuit", TEST_BASIC_CIRCUITS)

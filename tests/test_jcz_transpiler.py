@@ -37,8 +37,7 @@ TEST_BASIC_CIRCUITS = [
     Circuit(2, instr=[instruction.CNOT(0, 1)]),
     Circuit(3, instr=[instruction.CCX(0, (1, 2))]),
     Circuit(2, instr=[instruction.RZZ(0, 1, pi / 4)]),
-    Circuit(3, instr=[instruction.CNOT(0, 1), instruction.CCX(0, (1, 2)), instruction.RZ(0, pi / 4)])
-]
+    ]
 
 
 @pytest.mark.parametrize("circuit", TEST_BASIC_CIRCUITS)
@@ -120,6 +119,7 @@ def test_circuit_flow_og(circuit: Circuit) -> None:
     )
     assert f is not None
 
+
 @pytest.mark.parametrize("circuit", TEST_BASIC_CIRCUITS)
 def test_og_generation(circuit: Circuit) -> None:
     """Test that open graphs are extracted in the expected way."""
@@ -152,8 +152,10 @@ def test_random_circuit_og(fx_bg: PCG64, jumps: int, check: str) -> None:
     rng = Generator(fx_bg.jumped(jumps))
     nqubits = 4
     depth = 6
-    circuit = rand_circuit(nqubits, depth, rng, use_ccx=False)
+    circuit = rand_circuit(nqubits, depth, rng, use_ccx=True)
     if check == "simulation":
         test_circuit_simulation_og(circuit, rng)
     elif check == "flow":
         test_circuit_flow_og(circuit)
+    elif check == "generation":
+        test_og_generation(circuit)

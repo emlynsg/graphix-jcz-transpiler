@@ -13,7 +13,6 @@ import pytest
 from graphix import instruction
 from graphix.fundamentals import Plane
 from graphix.gflow import find_flow
-from graphix.opengraph import OpenGraph
 from graphix.random_objects import rand_circuit
 from graphix.sim.statevec import Statevec
 from graphix.simulator import DefaultMeasureMethod
@@ -77,7 +76,9 @@ def test_random_circuit(fx_bg: PCG64, jumps: int, check: str) -> None:
 def test_measure(fx_rng: Generator) -> None:
     """Test circuit transpilation with measurement.
 
-    Circuits transpiled in JCZ give patterns with causal flow. This test checks that measurement outcomes have probability 1/2 to occur (up to statistical fluctuations).
+    Circuits transpiled in JCZ give patterns with causal flow.
+    This test checks manual measurements work for the `transpile_jcz` function.
+    It also checks that measurements have uniform outcomes.
     """
     circuit = Circuit(2)
     circuit.h(1)
@@ -102,9 +103,6 @@ def test_measure(fx_rng: Generator) -> None:
 def test_circuit_simulation_og(circuit: Circuit, fx_rng: Generator) -> None:
     """Test circuit transpilation comparing state vector back-end."""
     pattern = transpile_jcz_open_graph(circuit).pattern
-    ## Pauli preprocessing can break the flow and minimize_space does not work well when there is no flow
-    ## Issues graphix#157 and graphix#363
-    # pattern.perform_pauli_measurements()
     pattern.minimize_space()
     state = circuit.simulate_statevector().statevec
     state_mbqc = pattern.simulate_pattern(rng=fx_rng)
@@ -159,5 +157,3 @@ def test_random_circuit_og(fx_bg: PCG64, jumps: int, check: str) -> None:
         test_circuit_simulation_og(circuit, rng)
     elif check == "flow":
         test_circuit_flow_og(circuit)
-    elif check == "generation":
-        test_og_generation(circuit)

@@ -14,7 +14,7 @@ from typing import TYPE_CHECKING, ClassVar, Literal
 
 import networkx as nx
 from graphix import Pattern, command, instruction
-from graphix.fundamentals import Plane
+from graphix.fundamentals import ANGLE_PI, ParameterizedAngle, Plane
 from graphix.instruction import InstructionKind
 from graphix.measurements import Measurement
 from graphix.opengraph import OpenGraph
@@ -22,7 +22,7 @@ from graphix.transpiler import Circuit, TranspileResult
 from typing_extensions import TypeAlias, assert_never
 
 if TYPE_CHECKING:
-    from collections.abc import Sequence
+    from collections.abc import Iterable, Sequence
 
     from graphix.parameter import ExpressionOrFloat
 
@@ -32,17 +32,6 @@ class JCZInstructionKind(Enum):
 
     CZ = enum.auto()
     J = enum.auto()
-
-
-@dataclass
-class CZ:
-    """CZ circuit instruction."""
-
-    targets: tuple[int, int]
-    kind: ClassVar[Literal[JCZInstructionKind.CZ]] = dataclasses.field(
-        default=JCZInstructionKind.CZ,
-        init=False,
-    )
 
 
 @dataclass
@@ -71,7 +60,7 @@ JCZInstruction: TypeAlias = (
     | instruction.RX
     | instruction.RY
     | instruction.RZ
-    | CZ
+    | instruction.CZ
     | J
 )
 
@@ -99,18 +88,18 @@ def decompose_ccx(
     return [
         instruction.H(instr.target),
         instruction.CNOT(control=instr.controls[1], target=instr.target),
-        instruction.RZ(instr.target, -pi / 4),
+        instruction.RZ(instr.target, -ANGLE_PI / 4),
         instruction.CNOT(control=instr.controls[0], target=instr.target),
-        instruction.RZ(instr.target, pi / 4),
+        instruction.RZ(instr.target, ANGLE_PI / 4),
         instruction.CNOT(control=instr.controls[1], target=instr.target),
-        instruction.RZ(instr.target, -pi / 4),
+        instruction.RZ(instr.target, -ANGLE_PI / 4),
         instruction.CNOT(control=instr.controls[0], target=instr.target),
-        instruction.RZ(instr.controls[1], pi / 4),
-        instruction.RZ(instr.target, pi / 4),
+        instruction.RZ(instr.controls[1], ANGLE_PI / 4),
+        instruction.RZ(instr.target, ANGLE_PI / 4),
         instruction.CNOT(control=instr.controls[0], target=instr.controls[1]),
         instruction.H(instr.target),
-        instruction.RZ(instr.controls[0], pi / 4),
-        instruction.RZ(instr.controls[1], -pi / 4),
+        instruction.RZ(instr.controls[0], ANGLE_PI / 4),
+        instruction.RZ(instr.controls[1], -ANGLE_PI / 4),
         instruction.CNOT(control=instr.controls[0], target=instr.controls[1]),
     ]
 
@@ -134,7 +123,7 @@ def decompose_rzz(instr: instruction.RZZ) -> list[instruction.CNOT | instruction
     ]
 
 
-def decompose_cnot(instr: instruction.CNOT) -> list[instruction.H | CZ]:
+def decompose_cnot(instr: instruction.CNOT) -> list[instruction.H | instruction.CZ]:
     """Return a decomposition of the CNOT gate as H·∧z·H.
 
     Vincent Danos, Elham Kashefi, Prakash Panangaden, The Measurement Calculus, 2007.
@@ -150,7 +139,7 @@ def decompose_cnot(instr: instruction.CNOT) -> list[instruction.H | CZ]:
     """
     return [
         instruction.H(instr.target),
-        CZ(targets=(instr.control, instr.target)),
+        instruction.CZ((instr.control, instr.target)),
         instruction.H(instr.target),
     ]
 
@@ -228,7 +217,7 @@ def decompose_ry(instr: instruction.RY) -> list[J]:
         the decomposition.
 
     """
-    return [J(target=instr.target, angle=angle) for angle in reversed((0, pi / 2, instr.angle, -pi / 2))]
+    return [J(target=instr.target, angle=angle) for angle in reversed((0, ANGLE_PI / 2, instr.angle, -ANGLE_PI / 2))]
 
 
 def decompose_rz(instr: instruction.RZ) -> list[J]:
@@ -249,7 +238,7 @@ def decompose_rz(instr: instruction.RZ) -> list[J]:
     return [J(target=instr.target, angle=angle) for angle in reversed((0, instr.angle))]
 
 
-def instruction_to_jcz(instr: JCZInstruction) -> Sequence[J | CZ]:
+def instruction_to_jcz(instr: JCZInstruction) -> Sequence[J | instruction.CZ]:
     """Return a J-∧z decomposition of the instruction.
 
     Args:
@@ -262,20 +251,20 @@ def instruction_to_jcz(instr: JCZInstruction) -> Sequence[J | CZ]:
 
     """
     # Use == for mypy
-    if instr.kind == JCZInstructionKind.J or instr.kind == JCZInstructionKind.CZ:  # noqa: PLR1714
+    if instr.kind in {JCZInstructionKind.J, InstructionKind.CZ}:
         return [instr]
     if instr.kind == InstructionKind.I:
         return []
     if instr.kind == InstructionKind.H:
         return [J(instr.target, 0)]
     if instr.kind == InstructionKind.S:
-        return instruction_to_jcz(instruction.RZ(instr.target, pi / 2))
+        return instruction_to_jcz(instruction.RZ(instr.target, ANGLE_PI / 2))
     if instr.kind == InstructionKind.X:
-        return instruction_to_jcz(instruction.RX(instr.target, pi))
+        return instruction_to_jcz(instruction.RX(instr.target, ANGLE_PI))
     if instr.kind == InstructionKind.Y:
         return instruction_list_to_jcz(decompose_y(instr))
     if instr.kind == InstructionKind.Z:
-        return instruction_to_jcz(instruction.RZ(instr.target, pi))
+        return instruction_to_jcz(instruction.RZ(instr.target, ANGLE_PI))
     if instr.kind == InstructionKind.RX:
         return decompose_rx(instr)
     if instr.kind == InstructionKind.RY:
@@ -293,7 +282,7 @@ def instruction_to_jcz(instr: JCZInstruction) -> Sequence[J | CZ]:
     assert_never(instr.kind)
 
 
-def instruction_list_to_jcz(instrs: Sequence[JCZInstruction]) -> list[J | CZ]:
+def instruction_list_to_jcz(instrs: Iterable[JCZInstruction]) -> list[J | instruction.CZ]:
     """Return a J-∧z decomposition of the sequence of instructions.
 
     Args:
@@ -332,7 +321,7 @@ class InternalInstructionError(Exception):
         super().__init__(f"Internal instruction: {instr}")
 
 
-def j_commands(current_node: int, next_node: int, angle: ExpressionOrFloat) -> list[command.Command]:
+def j_commands(current_node: int, next_node: int, angle: ParameterizedAngle) -> list[command.Command]:
     """Return the MBQC pattern commands for a J gate.
 
     Args:
@@ -350,7 +339,7 @@ def j_commands(current_node: int, next_node: int, angle: ExpressionOrFloat) -> l
     return [
         command.N(node=next_node),
         command.E(nodes=(current_node, next_node)),
-        command.M(node=current_node, angle=(angle / pi) + 0.0),  # Avoids -0.0
+        command.M(node=current_node, angle=(angle) + 0.0),  # Avoids -0.0
         command.X(node=next_node, domain={current_node}),
     ]
 
@@ -378,7 +367,7 @@ def transpile_jcz(circuit: Circuit) -> TranspileResult:
     classical_outputs = []
     for instr in circuit.instruction:
         if instr.kind == InstructionKind.M:
-            pattern.add(command.M(instr.target, instr.plane, instr.angle / pi))
+            pattern.extend(circuit._m_command(instr.target, instr.axis))  # noqa: SLF001
             classical_outputs.append(instr.target)
             indices[instr.target] = None
             continue
@@ -395,7 +384,7 @@ def transpile_jcz(circuit: Circuit) -> TranspileResult:
                 pattern.extend(j_commands(target, ancilla, -instr_jcz.angle))
                 indices[instr_jcz.target] = ancilla
                 continue
-            if instr_jcz.kind == JCZInstructionKind.CZ:
+            if instr_jcz.kind in {JCZInstructionKind.CZ, InstructionKind.CZ}:
                 t0, t1 = instr_jcz.targets
                 i0, i1 = indices[t0], indices[t1]
                 if i0 is None or i1 is None:
@@ -444,12 +433,11 @@ def circuit_to_open_graph(circuit: Circuit) -> OpenGraph[Measurement]:
                     raise IllformedCircuitError
                 ancilla = n_nodes
                 n_nodes += 1
-                graph.add_node(ancilla)
-                graph.add_edge(target, ancilla)
+                graph.add_edge(target, ancilla)  # Also adds nodes
                 measurements[target] = Measurement(-instr_jcz.angle / pi, plane=Plane.XY)
                 indices[instr_jcz.target] = ancilla
                 continue
-            if instr_jcz.kind == JCZInstructionKind.CZ:
+            if instr_jcz.kind in {JCZInstructionKind.CZ, InstructionKind.CZ}:
                 t0, t1 = instr_jcz.targets
                 i0, i1 = indices[t0], indices[t1]
                 if i0 is None or i1 is None:

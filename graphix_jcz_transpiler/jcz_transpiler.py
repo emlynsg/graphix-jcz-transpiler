@@ -24,6 +24,7 @@ from typing_extensions import TypeAlias, assert_never
 if TYPE_CHECKING:
     from collections.abc import Iterable, Sequence
 
+    from graphix.flow.core import CausalFlow
     from graphix.parameter import ExpressionOrFloat
 
 
@@ -396,7 +397,7 @@ def transpile_jcz(circuit: Circuit) -> TranspileResult:
     return TranspileResult(pattern, tuple(classical_outputs))
 
 
-def circuit_to_open_graph(circuit: Circuit) -> OpenGraph[Measurement]:
+def circuit_to_causal_flow(circuit: Circuit) -> CausalFlow[Measurement]:
     """Transpile a circuit via a J-∧z-like decomposition to an open graph.
 
     Args:
@@ -405,7 +406,7 @@ def circuit_to_open_graph(circuit: Circuit) -> OpenGraph[Measurement]:
 
     Returns:
     -------
-        the result of the transpilation: an open graph.
+        a causal flow.
 
     Raises:
     ------
@@ -446,7 +447,9 @@ def circuit_to_open_graph(circuit: Circuit) -> OpenGraph[Measurement]:
                 continue
             assert_never(instr_jcz.kind)
     outputs = [i for i in indices if i is not None]
-    return OpenGraph(graph=graph, input_nodes=inputs, output_nodes=outputs, measurements=measurements)
+    return OpenGraph(
+        graph=graph, input_nodes=inputs, output_nodes=outputs, measurements=measurements
+    ).find_causal_flow()
 
 
 def transpile_jcz_open_graph(circuit: Circuit) -> TranspileResult:
@@ -463,5 +466,5 @@ def transpile_jcz_open_graph(circuit: Circuit) -> TranspileResult:
         the result of the transpilation: a pattern.
 
     """
-    og = circuit_to_open_graph(circuit)
-    return TranspileResult(og.to_pattern(), tuple(og.measurements.keys()))
+    f = circuit_to_causal_flow(circuit)
+    return TranspileResult(f.to_corrections().to_pattern(), tuple(f.measurements.keys()))

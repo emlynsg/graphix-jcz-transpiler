@@ -9,7 +9,6 @@ import dataclasses
 import enum
 from dataclasses import dataclass
 from enum import Enum
-from math import pi
 from typing import TYPE_CHECKING, ClassVar, Literal
 
 import networkx as nx
@@ -358,7 +357,6 @@ def transpile_jcz(circuit: Circuit) -> TranspileResult:
 
     Raises:
     ------
-        InternalInstructionError: if the circuit contains internal _XC or _ZC instructions.
         IllformedCircuitError: if the circuit has underdefined instructions.
 
     """
@@ -372,9 +370,6 @@ def transpile_jcz(circuit: Circuit) -> TranspileResult:
             classical_outputs.append(instr.target)
             indices[instr.target] = None
             continue
-        # Use == for mypy
-        if instr.kind == InstructionKind._XC or instr.kind == InstructionKind._ZC:  # noqa: PLR1714, SLF001
-            raise InternalInstructionError(instr)
         for instr_jcz in instruction_to_jcz(instr):
             if instr_jcz.kind == JCZInstructionKind.J:
                 target = indices[instr_jcz.target]
@@ -411,7 +406,6 @@ def circuit_to_causal_flow(circuit: Circuit) -> CausalFlow[Measurement]:
     Raises:
     ------
         IllformedCircuitError: if the pattern is ill-formed (operation on already measured node)
-        InternalInstructionError: if the circuit contains internal _XC or _ZC instructions.
         CircuitWithMeasurementError: if the circuit contains measurements.
 
     """
@@ -424,9 +418,6 @@ def circuit_to_causal_flow(circuit: Circuit) -> CausalFlow[Measurement]:
     for instr in circuit.instruction:
         if instr.kind == InstructionKind.M:
             raise CircuitWithMeasurementError
-        # Use == for mypy
-        if instr.kind == InstructionKind._XC or instr.kind == InstructionKind._ZC:  # noqa: PLR1714, SLF001
-            raise InternalInstructionError(instr)
         for instr_jcz in instruction_to_jcz(instr):
             if instr_jcz.kind == JCZInstructionKind.J:
                 target = indices[instr_jcz.target]
@@ -435,7 +426,7 @@ def circuit_to_causal_flow(circuit: Circuit) -> CausalFlow[Measurement]:
                 ancilla = n_nodes
                 n_nodes += 1
                 graph.add_edge(target, ancilla)  # Also adds nodes
-                measurements[target] = Measurement(-instr_jcz.angle / pi, plane=Plane.XY)
+                measurements[target] = Measurement(-instr_jcz.angle, plane=Plane.XY)
                 indices[instr_jcz.target] = ancilla
                 continue
             if instr_jcz.kind in {JCZInstructionKind.CZ, InstructionKind.CZ}:
@@ -443,13 +434,17 @@ def circuit_to_causal_flow(circuit: Circuit) -> CausalFlow[Measurement]:
                 i0, i1 = indices[t0], indices[t1]
                 if i0 is None or i1 is None:
                     raise IllformedCircuitError
-                graph.add_edge(i0, i1)
+                # CZ gates toggle edges: if edge exists, remove it; otherwise add it
+                if graph.has_edge(i0, i1):
+                    graph.remove_edge(i0, i1)
+                else:
+                    graph.add_edge(i0, i1)
                 continue
             assert_never(instr_jcz.kind)
     outputs = [i for i in indices if i is not None]
     return OpenGraph(
         graph=graph, input_nodes=inputs, output_nodes=outputs, measurements=measurements
-    ).find_causal_flow()
+    ).extract_causal_flow()
 
 
 def transpile_jcz_open_graph(circuit: Circuit) -> TranspileResult:
@@ -467,4 +462,4 @@ def transpile_jcz_open_graph(circuit: Circuit) -> TranspileResult:
 
     """
     f = circuit_to_causal_flow(circuit)
-    return TranspileResult(f.to_corrections().to_pattern(), tuple(f.measurements.keys()))
+    return TranspileResult(f.to_corrections().to_pattern(), tuple(f.og.measurements.keys()))

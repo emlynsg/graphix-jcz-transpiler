@@ -17,7 +17,7 @@ from graphix.simulator import DefaultMeasureMethod
 from graphix.transpiler import Circuit
 from numpy.random import PCG64, Generator
 
-from graphix_jcz_transpiler import circuit_to_open_graph, transpile_jcz, transpile_jcz_open_graph
+from graphix_jcz_transpiler import circuit_to_causal_flow, transpile_jcz, transpile_jcz_open_graph
 
 logger = logging.getLogger(__name__)
 
@@ -83,7 +83,8 @@ def test_measure(fx_rng: Generator, axis: Axis) -> None:
     circuit.cnot(0, 1)
     circuit.m(0, axis)
     transpiled = transpile_jcz(circuit)
-    transpiled.pattern.perform_pauli_measurements()
+    transpiled.pattern.remove_input_nodes()
+    # Don't call perform_pauli_measurements() - it would make measurements deterministic
     transpiled.pattern.minimize_space()
 
     def simulate_and_measure() -> int:
@@ -111,9 +112,12 @@ def test_circuit_simulation_og(circuit: Circuit, fx_rng: Generator) -> None:
 @pytest.mark.parametrize("circuit", TEST_BASIC_CIRCUITS)
 def test_circuit_flow_og(circuit: Circuit) -> None:
     """Test transpiled circuits have flow."""
-    pattern = transpile_jcz_open_graph(circuit).pattern
-    f = pattern.extract_opengraph().find_causal_flow()
+    f = circuit_to_causal_flow(circuit)
+    jcz = transpile_jcz_open_graph(circuit)
+    og = jcz.pattern.extract_opengraph()
+    fprime = og.find_causal_flow()
     assert f is not None
+    assert fprime is not None
 
 
 @pytest.mark.parametrize("circuit", TEST_BASIC_CIRCUITS)
@@ -121,7 +125,8 @@ def test_og_generation(circuit: Circuit) -> None:
     """Test that open graphs are extracted in the expected way."""
     pattern = transpile_jcz(circuit).pattern
     og = pattern.extract_opengraph()
-    og_jcz = circuit_to_open_graph(circuit)
+    causal_flow_jcz = circuit_to_causal_flow(circuit)
+    og_jcz = causal_flow_jcz.og
     assert og.isclose(og_jcz)
 
 
@@ -130,8 +135,10 @@ def test_circuit_simulation_compare(circuit: Circuit, fx_rng: Generator) -> None
     """Test circuit transpilation comparing state vector back-end."""
     pattern = transpile_jcz(circuit).pattern
     pattern_og = transpile_jcz_open_graph(circuit).pattern
+    pattern.remove_input_nodes()
     pattern.perform_pauli_measurements()
     pattern.minimize_space()
+    pattern_og.remove_input_nodes()
     pattern_og.perform_pauli_measurements()
     pattern_og.minimize_space()
     state_mbqc = pattern.simulate_pattern(rng=fx_rng)

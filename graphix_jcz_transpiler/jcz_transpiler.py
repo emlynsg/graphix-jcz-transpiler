@@ -13,7 +13,6 @@ from typing import TYPE_CHECKING, AbstractSet, ClassVar, Literal, Mapping
 
 import networkx as nx
 from graphix import Pattern, command, instruction
-from graphix.flow._find_gpflow import AlgebraicOpenGraph, CorrectionMatrix
 from graphix.flow.core import CausalFlow
 from graphix.fundamentals import ANGLE_PI, ParameterizedAngle, Plane
 from graphix.instruction import InstructionKind
@@ -25,7 +24,6 @@ from typing_extensions import TypeAlias, assert_never
 if TYPE_CHECKING:
     from collections.abc import Iterable, Sequence
 
-    from graphix._linalg import MatGF2
     from graphix.parameter import ExpressionOrFloat
 
 
@@ -331,7 +329,6 @@ def j_commands(current_node: int, next_node: int, angle: ParameterizedAngle) -> 
         current_node: the current node.
         next_node: the next node.
         angle: the angle of the J gate.
-        domain: the domain the X correction is based on.
 
     Returns:
     -------
@@ -394,6 +391,31 @@ def transpile_jcz(circuit: Circuit) -> TranspileResult:
     return TranspileResult(pattern, tuple(classical_outputs))
 
 
+def _causal_flow_layers(
+    outputs: list[int],
+    correction_function: Mapping[int, AbstractSet[int]]) -> tuple[frozenset[int], ...]:
+    """Compute partial order layers for a causal flow.
+
+    Layer 0 contains output nodes. Each subsequent layer contains nodes
+    whose corrector is in a previous layer.
+    """
+    layers: list[frozenset[int]] = [frozenset(outputs)]
+    corrected: set[int] = set(outputs)
+    remaining: set[int] = set(correction_function.keys())
+    while remaining:
+        current_layer: set[int] = set()
+        for node in remaining:
+            (corrector,) = correction_function[node]
+            if corrector in corrected:
+                current_layer.add(node)
+        if not current_layer:
+            break
+        layers.append(frozenset(current_layer))
+        corrected |= current_layer
+        remaining -= current_layer
+    return tuple(layers)
+
+
 def circuit_to_causal_flow(circuit: Circuit) -> CausalFlow[Measurement]:
     """Transpile a circuit via a J-∧z-like decomposition to an open graph.
 
@@ -446,10 +468,9 @@ def circuit_to_causal_flow(circuit: Circuit) -> CausalFlow[Measurement]:
                 continue
             assert_never(instr_jcz.kind)
     outputs = [i for i in indices if i is not None]
-    c_matrix: MatGF2 = nx.to_numpy_array(graph, nodelist=range(n_nodes), dtype=int) % 2
-    og = OpenGraph(graph=graph, input_nodes=inputs, output_nodes=outputs, measurements=measurements)
-    cm = CorrectionMatrix(AlgebraicOpenGraph(og), c_matrix=cf.)
-    return CausalFlow.try_from_correction_matrix(cm)
+    og = OpenGraph(graph=graph, input_nodes=tuple(inputs), output_nodes=tuple(outputs), measurements=measurements)
+    partial_order_layers = _causal_flow_layers(outputs, correction_function)
+    return CausalFlow(og, correction_function, partial_order_layers)
 
 
 def transpile_jcz_open_graph(circuit: Circuit) -> TranspileResult:

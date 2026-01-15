@@ -9,10 +9,12 @@ import dataclasses
 import enum
 from dataclasses import dataclass
 from enum import Enum
-from typing import TYPE_CHECKING, ClassVar, Literal
+from typing import TYPE_CHECKING, AbstractSet, ClassVar, Literal, Mapping
 
 import networkx as nx
 from graphix import Pattern, command, instruction
+from graphix.flow._find_gpflow import AlgebraicOpenGraph, CorrectionMatrix
+from graphix.flow.core import CausalFlow
 from graphix.fundamentals import ANGLE_PI, ParameterizedAngle, Plane
 from graphix.instruction import InstructionKind
 from graphix.measurements import Measurement
@@ -23,7 +25,7 @@ from typing_extensions import TypeAlias, assert_never
 if TYPE_CHECKING:
     from collections.abc import Iterable, Sequence
 
-    from graphix.flow.core import CausalFlow
+    from graphix._linalg import MatGF2
     from graphix.parameter import ExpressionOrFloat
 
 
@@ -415,6 +417,7 @@ def circuit_to_causal_flow(circuit: Circuit) -> CausalFlow[Measurement]:
     inputs = list(range(n_nodes))
     graph: nx.Graph[int] = nx.Graph()  # type: ignore[name-defined,attr-defined]
     graph.add_nodes_from(inputs)
+    correction_function: dict[int, AbstractSet[int]] = {}
     for instr in circuit.instruction:
         if instr.kind == InstructionKind.M:
             raise CircuitWithMeasurementError
@@ -428,13 +431,14 @@ def circuit_to_causal_flow(circuit: Circuit) -> CausalFlow[Measurement]:
                 graph.add_edge(target, ancilla)  # Also adds nodes
                 measurements[target] = Measurement(-instr_jcz.angle, plane=Plane.XY)
                 indices[instr_jcz.target] = ancilla
+                correction_function[target] = {ancilla}  # X correction on ancilla
                 continue
             if instr_jcz.kind in {JCZInstructionKind.CZ, InstructionKind.CZ}:
                 t0, t1 = instr_jcz.targets
                 i0, i1 = indices[t0], indices[t1]
                 if i0 is None or i1 is None:
                     raise IllformedCircuitError
-                # CZ gates toggle edges: if edge exists, remove it; otherwise add it
+                # If edge exists, remove it; else, add it
                 if graph.has_edge(i0, i1):
                     graph.remove_edge(i0, i1)
                 else:
@@ -442,15 +446,14 @@ def circuit_to_causal_flow(circuit: Circuit) -> CausalFlow[Measurement]:
                 continue
             assert_never(instr_jcz.kind)
     outputs = [i for i in indices if i is not None]
-    return OpenGraph(
-        graph=graph, input_nodes=inputs, output_nodes=outputs, measurements=measurements
-    ).extract_causal_flow()
+    c_matrix: MatGF2 = nx.to_numpy_array(graph, nodelist=range(n_nodes), dtype=int) % 2
+    og = OpenGraph(graph=graph, input_nodes=inputs, output_nodes=outputs, measurements=measurements)
+    cm = CorrectionMatrix(AlgebraicOpenGraph(og), c_matrix=cf.)
+    return CausalFlow.try_from_correction_matrix(cm)
 
 
 def transpile_jcz_open_graph(circuit: Circuit) -> TranspileResult:
     """Transpile a circuit via a J-∧z-like decomposition to a pattern.
-
-    Currently fails due to overuse of memory in conversion from open graph to pattern, assumed in the causal flow step.
 
     Args:
     ----

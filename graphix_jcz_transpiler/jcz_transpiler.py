@@ -440,7 +440,7 @@ def circuit_to_causal_flow(circuit: Circuit) -> CausalFlow[Measurement]:
     n_nodes = circuit.width
     measurements: dict[int, Measurement] = {}
     inputs = list(range(n_nodes))
-    graph: nx.Graph[int] = nx.Graph()  # type: ignore[name-defined,attr-defined]
+    graph: nx.Graph[int] = nx.Graph()  # type: ignore[attr-defined, unused-ignore, name-defined]
     graph.add_nodes_from(inputs)
     correction_function: dict[int, AbstractSet[int]] = {}
     for instr in circuit.instruction:

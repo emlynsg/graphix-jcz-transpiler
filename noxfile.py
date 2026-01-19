@@ -17,7 +17,7 @@ def run_pytest(session: Session) -> None:
     session.run(*args)
 
 
-@nox.session(python=["3.10", "3.11", "3.12", "3.13", "3.14"])
+@nox.session(python=["3.10", "3.11", "3.12", "3.13", "3.14"])  # type: ignore[misc, unused-ignore]
 def tests_minimal(session: Session) -> None:
     """Run the test suite with minimal dependencies."""
     session.install(".")
@@ -25,7 +25,7 @@ def tests_minimal(session: Session) -> None:
     run_pytest(session)
 
 
-@nox.session(python=["3.10", "3.11", "3.12", "3.13", "3.14"])
+@nox.session(python=["3.10", "3.11", "3.12", "3.13", "3.14"])  # type: ignore[misc, unused-ignore]
 def tests_dev(session: Session) -> None:
     """Run the test suite with dev dependencies."""
     session.install(".[dev]")

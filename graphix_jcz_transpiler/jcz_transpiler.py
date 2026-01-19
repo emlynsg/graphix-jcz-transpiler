@@ -252,7 +252,9 @@ def instruction_to_jcz(instr: JCZInstruction) -> Sequence[J | instruction.CZ]:
 
     """
     # Use == for mypy
-    if instr.kind in {JCZInstructionKind.J, InstructionKind.CZ}:
+    if instr.kind == JCZInstructionKind.J:
+        return [instr]
+    if instr.kind == InstructionKind.CZ:
         return [instr]
     if instr.kind == InstructionKind.I:
         return []
@@ -380,7 +382,7 @@ def transpile_jcz(circuit: Circuit) -> TranspileResult:
                 pattern.extend(j_commands(target, ancilla, -instr_jcz.angle))
                 indices[instr_jcz.target] = ancilla
                 continue
-            if instr_jcz.kind in {JCZInstructionKind.CZ, InstructionKind.CZ}:
+            if instr_jcz.kind == InstructionKind.CZ:
                 t0, t1 = instr_jcz.targets
                 i0, i1 = indices[t0], indices[t1]
                 if i0 is None or i1 is None:
@@ -456,7 +458,7 @@ def circuit_to_causal_flow(circuit: Circuit) -> CausalFlow[Measurement]:
                 indices[instr_jcz.target] = ancilla
                 correction_function[target] = {ancilla}  # X correction on ancilla
                 continue
-            if instr_jcz.kind in {JCZInstructionKind.CZ, InstructionKind.CZ}:
+            if instr_jcz.kind == InstructionKind.CZ:
                 t0, t1 = instr_jcz.targets
                 i0, i1 = indices[t0], indices[t1]
                 if i0 is None or i1 is None:

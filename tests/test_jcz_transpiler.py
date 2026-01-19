@@ -158,3 +158,19 @@ def test_random_circuit_og(fx_bg: PCG64, jumps: int, check: str) -> None:
         test_circuit_simulation_og(circuit, rng)
     elif check == "flow":
         test_circuit_flow_og(circuit)
+
+
+@pytest.mark.parametrize("jumps", range(1, 11))
+def test_random_circuit_compare(fx_bg: PCG64, jumps: int) -> None:
+    """Test random circuit transpilation comparing direct and og transpilation."""
+    rng = Generator(fx_bg.jumped(jumps))
+    nqubits = 4
+    depth = 6
+    circuit = rand_circuit(nqubits, depth, rng, use_ccx=True)
+    pattern = transpile_jcz(circuit).pattern
+    pattern.minimize_space()
+    state = pattern.simulate_pattern(rng=rng)
+    pattern_og = transpile_jcz_open_graph(circuit).pattern
+    pattern_og.minimize_space()
+    state_og = pattern_og.simulate_pattern(rng=rng)
+    assert np.abs(np.dot(state.flatten().conjugate(), state_og.flatten())) == pytest.approx(1)

@@ -13,7 +13,7 @@ from typing import TYPE_CHECKING, ClassVar, Literal
 
 import networkx as nx
 from graphix import Pattern, command, instruction
-from graphix.flow.core import CausalFlow
+from graphix.flow.core import CausalFlow, _corrections_to_partial_order_layers  # noqa: PLC2701
 from graphix.fundamentals import ANGLE_PI, ParameterizedAngle, Plane
 from graphix.instruction import InstructionKind
 from graphix.measurements import Measurement
@@ -22,7 +22,7 @@ from graphix.transpiler import Circuit, TranspileResult
 from typing_extensions import TypeAlias, assert_never
 
 if TYPE_CHECKING:
-    from collections.abc import Iterable, Mapping, Sequence
+    from collections.abc import Iterable, Sequence
     from collections.abc import Set as AbstractSet
 
     from graphix.parameter import ExpressionOrFloat
@@ -394,31 +394,6 @@ def transpile_jcz(circuit: Circuit) -> TranspileResult:
     return TranspileResult(pattern, tuple(classical_outputs))
 
 
-def _causal_flow_layers(
-    outputs: list[int], correction_function: Mapping[int, AbstractSet[int]]
-) -> tuple[frozenset[int], ...]:
-    """Compute partial order layers for a causal flow.
-
-    Layer 0 contains output nodes. Each subsequent layer contains nodes
-    whose corrector is in a previous layer.
-    """
-    layers: list[frozenset[int]] = [frozenset(outputs)]
-    corrected: set[int] = set(outputs)
-    remaining: set[int] = set(correction_function.keys())
-    while remaining:
-        current_layer: set[int] = set()
-        for node in remaining:
-            (corrector,) = correction_function[node]
-            if corrector in corrected:
-                current_layer.add(node)
-        if not current_layer:
-            break
-        layers.append(frozenset(current_layer))
-        corrected |= current_layer
-        remaining -= current_layer
-    return tuple(layers)
-
-
 def circuit_to_causal_flow(circuit: Circuit) -> CausalFlow[Measurement]:
     """Transpile a circuit via a J-∧z-like decomposition to an open graph.
 
@@ -442,7 +417,7 @@ def circuit_to_causal_flow(circuit: Circuit) -> CausalFlow[Measurement]:
     inputs = list(range(n_nodes))
     graph: nx.Graph[int] = nx.Graph()  # type: ignore[attr-defined, unused-ignore, name-defined]
     graph.add_nodes_from(inputs)
-    correction_function: dict[int, AbstractSet[int]] = {}
+    x_corrections: dict[int, AbstractSet[int]] = {}
     for instr in circuit.instruction:
         if instr.kind == InstructionKind.M:
             raise CircuitWithMeasurementError
@@ -456,7 +431,7 @@ def circuit_to_causal_flow(circuit: Circuit) -> CausalFlow[Measurement]:
                 graph.add_edge(target, ancilla)  # Also adds nodes
                 measurements[target] = Measurement(-instr_jcz.angle, plane=Plane.XY)
                 indices[instr_jcz.target] = ancilla
-                correction_function[target] = {ancilla}  # X correction on ancilla
+                x_corrections[target] = {ancilla}  # X correction on ancilla
                 continue
             if instr_jcz.kind == InstructionKind.CZ:
                 t0, t1 = instr_jcz.targets
@@ -472,8 +447,14 @@ def circuit_to_causal_flow(circuit: Circuit) -> CausalFlow[Measurement]:
             assert_never(instr_jcz.kind)
     outputs = [i for i in indices if i is not None]
     og = OpenGraph(graph=graph, input_nodes=tuple(inputs), output_nodes=tuple(outputs), measurements=measurements)
-    partial_order_layers = _causal_flow_layers(outputs, correction_function)
-    return CausalFlow(og, correction_function, partial_order_layers)
+    z_corrections: dict[int, AbstractSet[int]] = {}  # Need to build Z on N(f(u))
+    for node, correctors in x_corrections.items():
+        (corrector,) = correctors
+        z_targets = set(graph.neighbors(corrector)) - {node}
+        if z_targets:
+            z_corrections[node] = z_targets
+    partial_order_layers = _corrections_to_partial_order_layers(og, x_corrections, z_corrections)
+    return CausalFlow(og, x_corrections, partial_order_layers)
 
 
 def transpile_jcz_open_graph(circuit: Circuit) -> TranspileResult:

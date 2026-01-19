@@ -1,41 +1,34 @@
-"""Nox sessions for running CI checks locally."""
+"""Run tests with nox."""
+
+from __future__ import annotations
 
 import nox
+from nox import Session
 
 
-@nox.session(python="3.12")
-def ruff_check(session):
-    """Run ruff check."""
-    session.install("-r", "requirements.txt", "-r", "requirements-dev.txt")
-    session.run("ruff", "check")
+def install_pytest(session: Session) -> None:
+    """Install pytest when requirements-dev.txt is not installed."""
+    session.install("pytest")
 
 
-@nox.session(python="3.12")
-def ruff_format(session):
-    """Run ruff format check."""
-    session.install("-r", "requirements.txt", "-r", "requirements-dev.txt")
-    session.run("ruff", "format", "--check")
-
-
-@nox.session(python="3.12")
-def mypy(session):
-    """Run mypy type checking."""
-    session.install("-r", "requirements.txt", "-r", "requirements-dev.txt")
-    session.run("mypy", ".")
-
-
-@nox.session(python="3.12")
-def pytest(session):
+def run_pytest(session: Session) -> None:
     """Run pytest."""
-    session.install("-r", "requirements.txt", "-r", "requirements-dev.txt")
-    session.run("pytest")
+    args = ["pytest"]
+    session.run(*args)
 
 
-@nox.session(python="3.12")
-def ci(session):
-    """Run all CI checks."""
-    session.install("-r", "requirements.txt", "-r", "requirements-dev.txt")
-    session.run("ruff", "check")
-    session.run("ruff", "format", "--check")
-    session.run("mypy", ".")
-    session.run("pytest")
+@nox.session(python=["3.10", "3.11", "3.12", "3.13", "3.14"])
+def tests_minimal(session: Session) -> None:
+    """Run the test suite with minimal dependencies."""
+    session.install(".")
+    install_pytest(session)
+    run_pytest(session)
+
+
+@nox.session(python=["3.10", "3.11", "3.12", "3.13", "3.14"])
+def tests_dev(session: Session) -> None:
+    """Run the test suite with dev dependencies."""
+    session.install(".[dev]")
+    # We cannot run `pytest --doctest-modules` here, since some tests
+    # involve optional dependencies, like pyzx.
+    run_pytest(session)

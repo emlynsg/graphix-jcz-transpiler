@@ -9,7 +9,7 @@ import dataclasses
 import enum
 from dataclasses import dataclass
 from enum import Enum
-from typing import TYPE_CHECKING, AbstractSet, ClassVar, Literal, Mapping
+from typing import TYPE_CHECKING, ClassVar, Literal
 
 import networkx as nx
 from graphix import Pattern, command, instruction
@@ -22,7 +22,8 @@ from graphix.transpiler import Circuit, TranspileResult
 from typing_extensions import TypeAlias, assert_never
 
 if TYPE_CHECKING:
-    from collections.abc import Iterable, Sequence
+    from collections.abc import Iterable, Mapping, Sequence
+    from collections.abc import Set as AbstractSet
 
     from graphix.parameter import ExpressionOrFloat
 
@@ -80,7 +81,7 @@ def decompose_ccx(
     ----
         instr: the CCX instruction to decompose.
 
-    Returns:
+    Returns
     -------
         the decomposition.
 
@@ -111,7 +112,7 @@ def decompose_rzz(instr: instruction.RZZ) -> list[instruction.CNOT | instruction
     ----
         instr: the RZZ instruction to decompose.
 
-    Returns:
+    Returns
     -------
         the decomposition.
 
@@ -132,7 +133,7 @@ def decompose_cnot(instr: instruction.CNOT) -> list[instruction.H | instruction.
     ----
         instr: the CNOT instruction to decompose.
 
-    Returns:
+    Returns
     -------
         the decomposition.
 
@@ -156,7 +157,7 @@ def decompose_swap(instr: instruction.SWAP) -> list[instruction.CNOT]:
     ----
         instr: the SWAP instruction to decompose.
 
-    Returns:
+    Returns
     -------
         the decomposition.
 
@@ -175,7 +176,7 @@ def decompose_y(instr: instruction.Y) -> list[instruction.X | instruction.Z]:
     ----
         instr: the Y instruction to decompose.
 
-    Returns:
+    Returns
     -------
         the decomposition.
 
@@ -193,7 +194,7 @@ def decompose_rx(instr: instruction.RX) -> list[J]:
     ----
         instr: the RX instruction to decompose.
 
-    Returns:
+    Returns
     -------
         the decomposition.
 
@@ -212,7 +213,7 @@ def decompose_ry(instr: instruction.RY) -> list[J]:
     ----
         instr: the RY instruction to decompose.
 
-    Returns:
+    Returns
     -------
         the decomposition.
 
@@ -230,7 +231,7 @@ def decompose_rz(instr: instruction.RZ) -> list[J]:
     ----
         instr: the RZ instruction to decompose.
 
-    Returns:
+    Returns
     -------
         the decomposition.
 
@@ -245,7 +246,7 @@ def instruction_to_jcz(instr: JCZInstruction) -> Sequence[J | instruction.CZ]:
     ----
         instr: the instruction to decompose.
 
-    Returns:
+    Returns
     -------
         the decomposition.
 
@@ -289,7 +290,7 @@ def instruction_list_to_jcz(instrs: Iterable[JCZInstruction]) -> list[J | instru
     ----
         instrs: the instruction sequence to decompose.
 
-    Returns:
+    Returns
     -------
         the decomposition.
 
@@ -330,7 +331,7 @@ def j_commands(current_node: int, next_node: int, angle: ParameterizedAngle) -> 
         next_node: the next node.
         angle: the angle of the J gate.
 
-    Returns:
+    Returns
     -------
         the MBQC pattern commands for a J gate as a list
 
@@ -350,11 +351,11 @@ def transpile_jcz(circuit: Circuit) -> TranspileResult:
     ----
         circuit: the circuit to transpile.
 
-    Returns:
+    Returns
     -------
         the result of the transpilation: a pattern and indices for measures.
 
-    Raises:
+    Raises
     ------
         IllformedCircuitError: if the circuit has underdefined instructions.
 
@@ -365,7 +366,7 @@ def transpile_jcz(circuit: Circuit) -> TranspileResult:
     classical_outputs = []
     for instr in circuit.instruction:
         if instr.kind == InstructionKind.M:
-            pattern.extend(circuit._m_command(instr.target, instr.axis))  # noqa: SLF001
+            pattern.extend(circuit._m_command(instr.target, instr.axis))
             classical_outputs.append(instr.target)
             indices[instr.target] = None
             continue
@@ -392,8 +393,8 @@ def transpile_jcz(circuit: Circuit) -> TranspileResult:
 
 
 def _causal_flow_layers(
-    outputs: list[int],
-    correction_function: Mapping[int, AbstractSet[int]]) -> tuple[frozenset[int], ...]:
+    outputs: list[int], correction_function: Mapping[int, AbstractSet[int]]
+) -> tuple[frozenset[int], ...]:
     """Compute partial order layers for a causal flow.
 
     Layer 0 contains output nodes. Each subsequent layer contains nodes
@@ -423,11 +424,11 @@ def circuit_to_causal_flow(circuit: Circuit) -> CausalFlow[Measurement]:
     ----
         circuit: the circuit to transpile.
 
-    Returns:
+    Returns
     -------
         a causal flow.
 
-    Raises:
+    Raises
     ------
         IllformedCircuitError: if the pattern is ill-formed (operation on already measured node)
         CircuitWithMeasurementError: if the circuit contains measurements.
@@ -480,7 +481,7 @@ def transpile_jcz_open_graph(circuit: Circuit) -> TranspileResult:
     ----
         circuit: the circuit to transpile.
 
-    Returns:
+    Returns
     -------
         the result of the transpilation: a pattern.
 

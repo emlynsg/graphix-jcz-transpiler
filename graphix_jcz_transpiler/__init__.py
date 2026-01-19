@@ -3,6 +3,8 @@
 Copyright (C) 2025, QAT team (ENS-PSL, Inria, CNRS).
 """
 
+from __future__ import annotations
+
 from graphix_jcz_transpiler.jcz_transpiler import (
     InternalInstructionError,
     J,

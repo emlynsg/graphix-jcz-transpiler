@@ -2,6 +2,7 @@
 name = "graphix_jcz_transpiler"
 version = "1"
 
+
 [tool.setuptools.packages.find]
 include = ["graphix_jcz_transpiler"]
 
@@ -93,6 +94,7 @@ files = ["*.py", "graphix_jcz_transpiler", "tests"]
 # exclude = []
 follow_imports = "silent"
 follow_untyped_imports = true # required for qiskit, requires mypy >=1.14
+ignore_missing_imports = true
 strict = true
 # mypy_path = "./stubs"
 

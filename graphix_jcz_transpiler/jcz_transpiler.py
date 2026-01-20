@@ -454,10 +454,10 @@ def circuit_to_causal_flow(circuit: Circuit) -> CausalFlow[Measurement]:
         if z_targets:
             z_corrections[node] = z_targets
     partial_order_layers = _corrections_to_partial_order_layers(og, x_corrections, z_corrections)
-    return CausalFlow(og, x_corrections, partial_order_layers)
+    return CausalFlow(og, x_corrections, partial_order_layers)  # Instead return XZCorrections?
 
 
-def transpile_jcz_open_graph(circuit: Circuit) -> TranspileResult:
+def transpile_jcz_cf(circuit: Circuit) -> TranspileResult:
     """Transpile a circuit via a J-∧z-like decomposition to a pattern.
 
     Args:

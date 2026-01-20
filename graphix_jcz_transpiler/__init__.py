@@ -6,6 +6,7 @@ Copyright (C) 2025, QAT team (ENS-PSL, Inria, CNRS).
 from __future__ import annotations
 
 from graphix_jcz_transpiler.jcz_transpiler import (
+    CircuitWithMeasurementError,
     InternalInstructionError,
     J,
     JCZInstructionKind,
@@ -19,10 +20,11 @@ from graphix_jcz_transpiler.jcz_transpiler import (
     decompose_y,
     j_commands,
     transpile_jcz,
-    transpile_jcz_open_graph,
+    transpile_jcz_cf,
 )
 
 __all__ = [
+    "CircuitWithMeasurementError",
     "InternalInstructionError",
     "J",
     "JCZInstructionKind",
@@ -36,5 +38,5 @@ __all__ = [
     "decompose_y",
     "j_commands",
     "transpile_jcz",
-    "transpile_jcz_open_graph",
+    "transpile_jcz_cf",
 ]

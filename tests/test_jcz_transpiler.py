@@ -50,7 +50,7 @@ def test_fails_with_measure() -> None:
 
 @pytest.mark.parametrize("circuit", TEST_BASIC_CIRCUITS)
 def test_circuit_simulation(circuit: Circuit, fx_rng: Generator) -> None:
-    """Test circuit transpilation simulation compared to direct simulation of the circuit."""
+    """Test circuit transpilation simulation matches direct simulation of the circuit."""
     pattern = transpile_jcz(circuit).pattern
     state = circuit.simulate_statevector().statevec
     state_mbqc = pattern.simulate_pattern(rng=fx_rng)
@@ -59,7 +59,7 @@ def test_circuit_simulation(circuit: Circuit, fx_rng: Generator) -> None:
 
 @pytest.mark.parametrize("circuit", TEST_BASIC_CIRCUITS)
 def test_check_circuit_flow(circuit: Circuit) -> None:
-    """Test transpiled circuits have flow."""
+    """Test directly transpiled basic circuits have flow."""
     pattern = transpile_jcz(circuit).pattern
     og = pattern.extract_opengraph()
     f = og.find_causal_flow()
@@ -82,7 +82,7 @@ def test_random_circuit(fx_bg: PCG64, jumps: int, check: str) -> None:
 
 @pytest.mark.parametrize("axis", [Axis.X, Axis.Y, Axis.Z])
 def test_measure(fx_rng: Generator, axis: Axis) -> None:
-    """Test circuit transpilation with measurement.
+    """Test direct circuit transpilation with measurement.
 
     Circuits transpiled in JCZ give patterns with causal flow.
     This test checks manual measurements work for the `transpile_jcz` function.
@@ -110,14 +110,14 @@ def test_measure(fx_rng: Generator, axis: Axis) -> None:
 
 @pytest.mark.parametrize("circuit", TEST_BASIC_CIRCUITS)
 def test_check_circuit_flow_cf(circuit: Circuit) -> None:
-    """Test transpiled circuits have flow."""
+    """Test CausalFlow transpiled circuits don't fail."""
     f = circuit_to_causal_flow(circuit)
     assert f is not None
 
 
 @pytest.mark.parametrize("circuit", TEST_BASIC_CIRCUITS)
 def test_circuit_simulation_cf(circuit: Circuit, fx_rng: Generator) -> None:
-    """Test causal flow transpilation simulation compared to direct simulation of the circuit."""
+    """Test causal flow transpilation simulation matches direct simulation of the circuit."""
     pattern = transpile_jcz_cf(circuit).pattern
     pattern.minimize_space()
     state = circuit.simulate_statevector().statevec
@@ -127,45 +127,12 @@ def test_circuit_simulation_cf(circuit: Circuit, fx_rng: Generator) -> None:
 
 @pytest.mark.parametrize("circuit", TEST_BASIC_CIRCUITS)
 def test_circuit_flow_cf(circuit: Circuit) -> None:
-    """Test causal flow transpiled circuits have flow and that they match existing Graphix and direct JCZ transpilation flows."""
+    """Test causal flow transpiled circuits match direct JCZ transpilation open graph, correction function and partial order."""
     f_cf = circuit_to_causal_flow(circuit)
     f_dir = transpile_jcz(circuit).pattern.extract_causal_flow()
-    f_gpx = circuit.transpile().pattern.extract_causal_flow()
-    assert f_cf is not None
-    assert f_dir is not None
-    assert f_gpx is not None
     assert f_cf.og.isclose(f_dir.og)
-    # assert f_cf.og.isclose(f_gpx.og)  # This fails due to current Graphix optimisations
     assert f_cf.correction_function == f_dir.correction_function
-    # assert f_cf.correction_function == f_gpx.correction_function  # This fails due to current Graphix optimisations
     assert f_cf.partial_order_layers == f_dir.partial_order_layers
-    # assert f_cf.partial_order_layers == f_gpx.partial_order_layers  # This fails due to current Graphix optimisations
-
-
-@pytest.mark.parametrize("circuit", TEST_BASIC_CIRCUITS)
-def test_circuit_pattern_cf(circuit: Circuit) -> None:
-    """Test causal flow transpiled circuits have flow and that they match existing Graphix and direct JCZ transpilation flows."""
-    pattern_cf = transpile_jcz_cf(circuit).pattern
-    pattern_dir = transpile_jcz(circuit).pattern
-    pattern_gpx = circuit.transpile().pattern
-    pattern_cf.minimize_space()
-    pattern_dir.minimize_space()
-    pattern_gpx.minimize_space()
-    pattern_cf.standardize()
-    pattern_dir.standardize()
-    pattern_gpx.standardize()
-    pattern_cf.check_runnability()
-    pattern_dir.check_runnability()
-    assert pattern_cf == pattern_dir
-    # assert pattern_cf == pattern_gpx  # This fails due to current Graphix optimisations
-
-
-@pytest.mark.parametrize("circuit", TEST_BASIC_CIRCUITS)
-def test_og_generation(circuit: Circuit) -> None:
-    """Test that open graphs for direct and causal flow transpilation are equal."""
-    og = transpile_jcz(circuit).pattern.extract_opengraph()
-    og_jcz = circuit_to_causal_flow(circuit).og
-    assert og.isclose(og_jcz)
 
 
 @pytest.mark.parametrize("circuit", TEST_BASIC_CIRCUITS)
@@ -179,6 +146,9 @@ def test_circuit_simulation_compare_direct(circuit: Circuit, fx_rng: Generator) 
     pattern_cf.remove_input_nodes()
     pattern_cf.perform_pauli_measurements()
     pattern_cf.minimize_space()
+    pattern.check_runnability()
+    pattern_cf.check_runnability()
+    assert pattern == pattern_cf
     state_mbqc = pattern.simulate_pattern(rng=fx_rng)
     state_mbqc_cf = pattern_cf.simulate_pattern(rng=fx_rng)
     assert np.abs(np.dot(state_mbqc.flatten().conjugate(), state_mbqc_cf.flatten())) == pytest.approx(1)
@@ -186,7 +156,7 @@ def test_circuit_simulation_compare_direct(circuit: Circuit, fx_rng: Generator) 
 
 @pytest.mark.parametrize("circuit", TEST_BASIC_CIRCUITS)
 def test_circuit_simulation_compare_graphix(circuit: Circuit, fx_rng: Generator) -> None:
-    """Test comparing Graphix' current transpilation to causal flow transpilation."""
+    """Test comparing Graphix main transpiler pattern simulation to causal flow transpilation."""
     pattern = circuit.transpile().pattern
     pattern_cf = transpile_jcz_cf(circuit).pattern
     pattern.remove_input_nodes()

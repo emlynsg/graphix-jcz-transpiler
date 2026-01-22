@@ -9,8 +9,8 @@ import logging
 
 import numpy as np
 import pytest
-from graphix import instruction
-from graphix.fundamentals import ANGLE_PI, Axis
+from graphix import Pattern, command, instruction
+from graphix.fundamentals import ANGLE_PI, Axis, Plane
 from graphix.random_objects import rand_circuit
 from graphix.sim.statevec import Statevec
 from graphix.simulator import DefaultMeasureMethod
@@ -36,6 +36,40 @@ TEST_BASIC_CIRCUITS = [
     Circuit(3, instr=[instruction.CCX(0, (1, 2))]),
     Circuit(2, instr=[instruction.RZZ(0, 1, ANGLE_PI / 4)]),
 ]
+
+
+def check_pattern_equality(pattern1: Pattern, pattern2: Pattern) -> None:
+    """Check if two patterns are equal (ignoring order of operations for N and E)."""
+    n_set_1: list[int] = []
+    e_set_1: list[tuple[int, int]] = []
+    m_list_1: list[list[Plane | float | set[int]]] = []
+    c_list_1: list[list[int | set[int]]] = []
+    n_set_2: list[int] = []
+    e_set_2: list[tuple[int, int]] = []
+    m_list_2: list[list[Plane | float | set[int]]] = []
+    c_list_2: list[list[int | set[int]]] = []
+    for elt in pattern1:
+        if isinstance(elt, command.N):
+            n_set_1.append(elt.node)
+        elif isinstance(elt, command.E):
+            e_set_1.append(elt.nodes)
+        elif isinstance(elt, command.M):
+            m_list_1.append([elt.plane, float(elt.angle), elt.s_domain, elt.t_domain])
+        else:
+            c_list_1.append([elt.node, elt.domain])
+    for elt in pattern2:
+        if isinstance(elt, command.N):
+            n_set_2.append(elt.node)
+        elif isinstance(elt, command.E):
+            e_set_2.append(elt.nodes)
+        elif isinstance(elt, command.M):
+            m_list_2.append([elt.plane, float(elt.angle), elt.s_domain, elt.t_domain])
+        else:
+            c_list_2.append([elt.node, elt.domain])
+    assert sorted(n_set_1) == sorted(n_set_2)
+    assert sorted(e_set_1) == sorted(e_set_2)
+    assert m_list_1 == m_list_2
+    assert c_list_1 == c_list_2
 
 
 def test_fails_with_measure() -> None:
@@ -148,14 +182,18 @@ def test_circuit_pattern_cf(circuit: Circuit) -> None:
     pattern_cf = transpile_jcz_cf(circuit).pattern
     pattern_dir = transpile_jcz(circuit).pattern
     pattern_gpx = circuit.transpile().pattern
-    pattern_cf.standardize()
-    pattern_dir.standardize()
+    pattern_cf.minimize_space()
+    pattern_dir.minimize_space()
+    pattern_gpx.minimize_space()
     pattern_cf.standardize()
     pattern_dir.standardize()
     pattern_gpx.standardize()
     pattern_cf.check_runnability()
     pattern_dir.check_runnability()
-    # assert pattern_cf == pattern_dir  # This fails on CCX where one has E((8, 1)) then E((5, 6)) and the other this order is swapped
+    check_pattern_equality(
+        pattern_cf, pattern_dir
+    )  # Doesn't check order, but functionally different order would be captured by other tests
+    assert pattern_cf == pattern_dir
     # assert pattern_cf == pattern_gpx  # This fails due to current Graphix optimisations
 
 

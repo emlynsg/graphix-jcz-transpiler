@@ -13,12 +13,19 @@ from typing import TYPE_CHECKING, ClassVar, Literal
 
 import networkx as nx
 from graphix import Pattern, command, instruction
-from graphix.flow.core import CausalFlow, _corrections_to_partial_order_layers  # noqa: PLC2701
+from graphix.flow.core import (
+    CausalFlow,
+    _corrections_to_partial_order_layers,
+)
 from graphix.fundamentals import ANGLE_PI, ParameterizedAngle, Plane
 from graphix.instruction import InstructionKind
 from graphix.measurements import Measurement
 from graphix.opengraph import OpenGraph
-from graphix.transpiler import Circuit, TranspileResult
+from graphix.transpiler import (
+    Circuit,
+    TranspileResult,
+    _measurement_of_axis,  # noqa: PLC2701
+)
 from typing_extensions import TypeAlias, assert_never
 
 if TYPE_CHECKING:
@@ -218,7 +225,10 @@ def decompose_ry(instr: instruction.RY) -> list[J]:
         the decomposition.
 
     """
-    return [J(target=instr.target, angle=angle) for angle in reversed((0, ANGLE_PI / 2, instr.angle, -ANGLE_PI / 2))]
+    return [
+        J(target=instr.target, angle=angle)
+        for angle in reversed((0, ANGLE_PI / 2, instr.angle, -ANGLE_PI / 2))
+    ]
 
 
 def decompose_rz(instr: instruction.RZ) -> list[J]:
@@ -285,7 +295,9 @@ def instruction_to_jcz(instr: JCZInstruction) -> Sequence[J | instruction.CZ]:
     assert_never(instr.kind)
 
 
-def instruction_list_to_jcz(instrs: Iterable[JCZInstruction]) -> list[J | instruction.CZ]:
+def instruction_list_to_jcz(
+    instrs: Iterable[JCZInstruction],
+) -> list[J | instruction.CZ]:
     """Return a J-∧z decomposition of the sequence of instructions.
 
     Args:
@@ -313,7 +325,9 @@ class CircuitWithMeasurementError(Exception):
 
     def __init__(self) -> None:
         """Build the exception."""
-        super().__init__("Circuits containing measurements are not supported by the transpiler.")
+        super().__init__(
+            "Circuits containing measurements are not supported by the transpiler."
+        )
 
 
 class InternalInstructionError(Exception):
@@ -324,7 +338,9 @@ class InternalInstructionError(Exception):
         super().__init__(f"Internal instruction: {instr}")
 
 
-def j_commands(current_node: int, next_node: int, angle: ParameterizedAngle) -> list[command.Command]:
+def j_commands(
+    current_node: int, next_node: int, angle: ParameterizedAngle
+) -> list[command.Command]:
     """Return the MBQC pattern commands for a J gate.
 
     Args:
@@ -362,15 +378,19 @@ def transpile_jcz(circuit: Circuit) -> TranspileResult:
         IllformedCircuitError: if the circuit has underdefined instructions.
 
     """
-    indices: list[int | None] = list(range(circuit.width))
     n_nodes = circuit.width
-    pattern = Pattern(input_nodes=list(range(circuit.width)))
-    classical_outputs = []
+    indices: list[int | None] = list(range(n_nodes))
+    pattern = Pattern(input_nodes=list(range(n_nodes)))
+    classical_outputs: dict[int, command.M] = {}
     for instr in circuit.instruction:
         if instr.kind == InstructionKind.M:
-            pattern.extend(circuit._m_command(instr.target, instr.axis))
-            classical_outputs.append(instr.target)
-            indices[instr.target] = None
+            target = indices[instr.target]
+            if target is None:
+                raise IllformedCircuitError
+            measurement = _measurement_of_axis(instr.axis)
+            classical_outputs[target] = command.M(
+                node=target, plane=measurement.plane, angle=measurement.angle
+            )
             continue
         for instr_jcz in instruction_to_jcz(instr):
             if instr_jcz.kind == JCZInstructionKind.J:
@@ -390,11 +410,17 @@ def transpile_jcz(circuit: Circuit) -> TranspileResult:
                 pattern.extend([command.E(nodes=(i0, i1))])
                 continue
             assert_never(instr_jcz.kind)
-    pattern.reorder_output_nodes([i for i in indices if i is not None])
-    return TranspileResult(pattern, tuple(classical_outputs))
+    # pattern = Pattern(
+    #     pattern.input_nodes, list(pattern), [i for i in indices if i is not None]
+    # )
+    pattern.extend(classical_outputs.values())
+    # pattern.reorder_output_nodes([i for i in indices if i is not None])
+    return TranspileResult(pattern, tuple(classical_outputs.keys()))
 
 
-def circuit_to_causal_flow(circuit: Circuit) -> CausalFlow[Measurement]:
+def circuit_to_causal_flow(
+    circuit: Circuit,
+) -> tuple[CausalFlow[Measurement], dict[int, command.M]]:
     """Transpile a circuit via a J-∧z-like decomposition to an open graph.
 
     Args:
@@ -414,24 +440,32 @@ def circuit_to_causal_flow(circuit: Circuit) -> CausalFlow[Measurement]:
     indices: list[int | None] = list(range(circuit.width))
     n_nodes = circuit.width
     measurements: dict[int, Measurement] = {}
+    classical_outputs: dict[int, command.M] = {}
     inputs = list(range(n_nodes))
-    graph: nx.Graph[int] = nx.Graph()  # type: ignore[attr-defined, unused-ignore, name-defined]
+    graph: nx.Graph[int] = nx.Graph()
     graph.add_nodes_from(inputs)
     x_corrections: dict[int, AbstractSet[int]] = {}
     for instr in circuit.instruction:
         if instr.kind == InstructionKind.M:
-            raise CircuitWithMeasurementError
+            # raise CircuitWithMeasurementError
+            target = indices[instr.target]
+            if target is None:
+                raise IllformedCircuitError
+            measurement = _measurement_of_axis(instr.axis)
+            classical_outputs[target] = command.M(
+                node=target, plane=measurement.plane, angle=measurement.angle
+            )
+            continue
         for instr_jcz in instruction_to_jcz(instr):
             if instr_jcz.kind == JCZInstructionKind.J:
                 target = indices[instr_jcz.target]
                 if target is None:
                     raise IllformedCircuitError
-                ancilla = n_nodes
-                n_nodes += 1
-                graph.add_edge(target, ancilla)  # Also adds nodes
+                graph.add_edge(target, n_nodes)  # Also adds nodes
                 measurements[target] = Measurement(-instr_jcz.angle, plane=Plane.XY)
-                indices[instr_jcz.target] = ancilla
-                x_corrections[target] = {ancilla}  # X correction on ancilla
+                indices[instr_jcz.target] = n_nodes
+                x_corrections[target] = {n_nodes}  # X correction on ancilla
+                n_nodes += 1
                 continue
             if instr_jcz.kind == InstructionKind.CZ:
                 t0, t1 = instr_jcz.targets
@@ -446,15 +480,22 @@ def circuit_to_causal_flow(circuit: Circuit) -> CausalFlow[Measurement]:
                 continue
             assert_never(instr_jcz.kind)
     outputs = [i for i in indices if i is not None]
-    og = OpenGraph(graph=graph, input_nodes=tuple(inputs), output_nodes=tuple(outputs), measurements=measurements)
-    z_corrections: dict[int, AbstractSet[int]] = {}  # Need to build Z on N(f(u))
+    og = OpenGraph(
+        graph=graph,
+        input_nodes=tuple(inputs),
+        output_nodes=tuple(outputs),
+        measurements=measurements,
+    )
+    z_corrections: dict[int, AbstractSet[int]] = {}
     for node, correctors in x_corrections.items():
         (corrector,) = correctors
         z_targets = set(graph.neighbors(corrector)) - {node}
         if z_targets:
             z_corrections[node] = z_targets
-    partial_order_layers = _corrections_to_partial_order_layers(og, x_corrections, z_corrections)
-    return CausalFlow(og, x_corrections, partial_order_layers)  # Instead return XZCorrections?
+    partial_order_layers = _corrections_to_partial_order_layers(
+        og, x_corrections, z_corrections
+    )
+    return CausalFlow(og, x_corrections, partial_order_layers), classical_outputs
 
 
 def transpile_jcz_cf(circuit: Circuit) -> TranspileResult:
@@ -469,5 +510,7 @@ def transpile_jcz_cf(circuit: Circuit) -> TranspileResult:
         the result of the transpilation: a pattern.
 
     """
-    f = circuit_to_causal_flow(circuit)
-    return TranspileResult(f.to_corrections().to_pattern(), tuple(f.og.measurements.keys()))
+    f, classical_outputs = circuit_to_causal_flow(circuit)
+    pattern = f.to_corrections().to_pattern()
+    pattern.extend(classical_outputs.values())
+    return TranspileResult(pattern, tuple(classical_outputs.keys()))

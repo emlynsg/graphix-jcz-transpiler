@@ -15,9 +15,13 @@ from graphix.random_objects import rand_circuit
 from graphix.sim.statevec import Statevec
 from graphix.simulator import DefaultMeasureMethod
 from graphix.transpiler import Circuit
-from numpy.random import PCG64, Generator
 
-from graphix_jcz_transpiler import CircuitWithMeasurementError, circuit_to_causal_flow, transpile_jcz, transpile_jcz_cf
+from graphix_jcz_transpiler import (
+    circuit_to_causal_flow,
+    transpile_jcz,
+    transpile_jcz_cf,
+)
+from tests.conftest import PCG64, Generator  # ignore[attr-defined]
 
 logger = logging.getLogger(__name__)
 
@@ -36,16 +40,6 @@ TEST_BASIC_CIRCUITS = [
     Circuit(3, instr=[instruction.CCX(0, (1, 2))]),
     Circuit(2, instr=[instruction.RZZ(0, 1, ANGLE_PI / 4)]),
 ]
-
-
-def test_fails_with_measure() -> None:
-    """Test causal flow circuit transpilation fails with measurement."""
-    circuit = Circuit(2)
-    circuit.h(1)
-    circuit.cnot(0, 1)
-    circuit.m(0, Axis.X)
-    with pytest.raises(CircuitWithMeasurementError):
-        transpile_jcz_cf(circuit)
 
 
 @pytest.mark.parametrize("circuit", TEST_BASIC_CIRCUITS)
@@ -99,7 +93,7 @@ def test_measure(fx_rng: Generator, axis: Axis) -> None:
     def simulate_and_measure() -> int:
         measure_method = DefaultMeasureMethod(results=transpiled.pattern.results)
         state = transpiled.pattern.simulate_pattern(rng=fx_rng, measure_method=measure_method)
-        measured = measure_method.get_measure_result(transpiled.classical_outputs[0])
+        measured = measure_method.measurement_outcome(transpiled.classical_outputs[0])
         assert isinstance(state, Statevec)
         return measured
 
@@ -128,7 +122,7 @@ def test_circuit_simulation_cf(circuit: Circuit, fx_rng: Generator) -> None:
 @pytest.mark.parametrize("circuit", TEST_BASIC_CIRCUITS)
 def test_circuit_flow_cf(circuit: Circuit) -> None:
     """Test causal flow transpiled circuits match direct JCZ transpilation open graph, correction function and partial order."""
-    f_cf = circuit_to_causal_flow(circuit)
+    f_cf = circuit_to_causal_flow(circuit)[0]
     f_dir = transpile_jcz(circuit).pattern.extract_causal_flow()
     assert f_cf.og.isclose(f_dir.og)
     assert f_cf.correction_function == f_dir.correction_function
@@ -139,7 +133,10 @@ def test_circuit_flow_cf(circuit: Circuit) -> None:
 def test_circuit_simulation_compare_direct(circuit: Circuit, fx_rng: Generator) -> None:
     """Test comparing direct to causal flow transpilation."""
     pattern = transpile_jcz(circuit).pattern
+    pattern.standardize()
     pattern_cf = transpile_jcz_cf(circuit).pattern
+    pattern_cf.standardize()
+    assert pattern == pattern_cf
     pattern.remove_input_nodes()
     pattern.perform_pauli_measurements()
     pattern.minimize_space()
@@ -198,3 +195,89 @@ def test_random_circuit_compare(fx_bg: PCG64, jumps: int) -> None:
     pattern_og.minimize_space()
     state_og = pattern_og.simulate_pattern(rng=rng)
     assert np.abs(np.dot(state.flatten().conjugate(), state_og.flatten())) == pytest.approx(1)
+
+
+@pytest.mark.parametrize("jumps", range(1, 11))
+def test_random_circuit_with_m(fx_bg: PCG64, jumps: int) -> None:
+    """Test random circuit transpilation comparing direct and causal flow transpilation."""
+    rng = Generator(fx_bg.jumped(jumps))
+    nqubits = 4
+    depth = 6
+    circuit = rand_circuit(nqubits, depth, rng, use_ccx=True)
+    circuit.m(1, Axis.Z)
+    pattern = transpile_jcz(circuit).pattern
+    pattern.parallelize_pattern()
+    # pattern.minimize_space()
+    state = pattern.simulate_pattern(rng=rng)
+    pattern_og = transpile_jcz_cf(circuit).pattern
+    pattern_og.parallelize_pattern()
+    # pattern_og.minimize_space()
+    state_og = pattern_og.simulate_pattern(rng=rng)
+    pattern_gpx = circuit.transpile().pattern
+    pattern_gpx.parallelize_pattern()
+    # pattern_gpx.minimize_space()
+    state_gpx = pattern_gpx.simulate_pattern(rng=rng)
+    assert pattern == pattern_og
+    # assert pattern_gpx == pattern_og
+    assert np.abs(np.dot(state.flatten().conjugate(), state_og.flatten())) == pytest.approx(1)
+    assert np.abs(np.dot(state_gpx.flatten().conjugate(), state_og.flatten())) == pytest.approx(1)
+
+
+def test_circuit_compare_with_m_start(fx_rng: Generator) -> None:
+    circuit = Circuit(3)
+    circuit.m(0, Axis.Y)
+    circuit.ry(1, ANGLE_PI / 5)
+    circuit.cnot(1, 2)
+    pattern_gpx = circuit.transpile().pattern
+    pattern_gpx.parallelize_pattern()
+    pattern = transpile_jcz(circuit).pattern
+    pattern.parallelize_pattern()
+    state = pattern.simulate_pattern(rng=fx_rng)
+    pattern_og = transpile_jcz_cf(circuit).pattern
+    pattern_og.parallelize_pattern()
+    assert pattern == pattern_og
+    assert pattern_gpx == pattern_og
+    state_og = pattern_og.simulate_pattern(rng=fx_rng)
+    state_gpx = pattern_gpx.simulate_pattern(rng=fx_rng)
+    assert np.abs(np.dot(state.flatten().conjugate(), state_og.flatten())) == pytest.approx(1)
+    assert np.abs(np.dot(state_og.flatten().conjugate(), state_gpx.flatten())) == pytest.approx(1)
+
+
+def test_circuit_compare_with_m_middle(fx_rng: Generator) -> None:
+    circuit = Circuit(3)
+    circuit.ry(1, ANGLE_PI / 5)
+    circuit.m(1, Axis.Y)
+    circuit.cnot(0, 2)
+    pattern_gpx = circuit.transpile().pattern
+    pattern_gpx.parallelize_pattern()
+    pattern = transpile_jcz(circuit).pattern
+    pattern.parallelize_pattern()
+    state = pattern.simulate_pattern(rng=fx_rng)
+    pattern_og = transpile_jcz_cf(circuit).pattern
+    pattern_og.parallelize_pattern()
+    assert pattern == pattern_og
+    assert pattern_gpx == pattern_og
+    state_og = pattern_og.simulate_pattern(rng=fx_rng)
+    state_gpx = pattern_gpx.simulate_pattern(rng=fx_rng)
+    assert np.abs(np.dot(state.flatten().conjugate(), state_og.flatten())) == pytest.approx(1)
+    assert np.abs(np.dot(state_og.flatten().conjugate(), state_gpx.flatten())) == pytest.approx(1)
+
+
+def test_circuit_compare_with_m_end(fx_rng: Generator) -> None:
+    circuit = Circuit(3)
+    circuit.ry(1, ANGLE_PI / 5)
+    circuit.cnot(0, 1)
+    circuit.m(1, Axis.Y)
+    pattern_gpx = circuit.transpile().pattern
+    pattern_gpx.parallelize_pattern()
+    pattern = transpile_jcz(circuit).pattern
+    pattern.parallelize_pattern()
+    pattern_og = transpile_jcz_cf(circuit).pattern
+    pattern_og.parallelize_pattern()
+    assert pattern == pattern_og
+    assert pattern_gpx == pattern_og
+    state = pattern.simulate_pattern(rng=fx_rng)
+    state_og = pattern_og.simulate_pattern(rng=fx_rng)
+    state_gpx = pattern_gpx.simulate_pattern(rng=fx_rng)
+    assert np.abs(np.dot(state.flatten().conjugate(), state_og.flatten())) == pytest.approx(1)
+    assert np.abs(np.dot(state_og.flatten().conjugate(), state_gpx.flatten())) == pytest.approx(1)

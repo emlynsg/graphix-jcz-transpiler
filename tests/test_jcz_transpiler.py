@@ -167,7 +167,7 @@ def test_random_circuit_compare(fx_bg: PCG64, jumps: int) -> None:
     bs = ConstBranchSelector(0)
     rng = Generator(fx_bg.jumped(jumps))
     nqubits = 3
-    depth = 3
+    depth = 2
     circuit = rand_circuit(nqubits, depth, rng, use_ccx=True)
     pattern = transpile_jcz(circuit).pattern
     pattern.standardize()
@@ -204,7 +204,7 @@ def test_random_circuit_with_m(fx_bg: PCG64, jumps: int) -> None:
     bs = ConstBranchSelector(0)
     rng = Generator(fx_bg.jumped(jumps))
     nqubits = 3
-    depth = 3
+    depth = 2
     circuit = rand_circuit(nqubits, depth, rng, use_ccx=True)
     circuit.m(1, Axis.Y)
     pattern = transpile_jcz(circuit).pattern

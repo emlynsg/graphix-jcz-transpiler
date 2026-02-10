@@ -7,6 +7,7 @@ from __future__ import annotations
 
 from graphix_jcz_transpiler.jcz_transpiler import (
     CircuitWithMeasurementError,
+    IllformedCircuitError,
     InternalInstructionError,
     J,
     JCZInstructionKind,
@@ -25,6 +26,7 @@ from graphix_jcz_transpiler.jcz_transpiler import (
 
 __all__ = [
     "CircuitWithMeasurementError",
+    "IllformedCircuitError",
     "InternalInstructionError",
     "J",
     "JCZInstructionKind",

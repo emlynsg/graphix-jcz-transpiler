@@ -15,7 +15,7 @@ import networkx as nx
 from graphix import Pattern, command, instruction
 from graphix.flow.core import (
     CausalFlow,
-    _corrections_to_partial_order_layers,
+    _corrections_to_partial_order_layers,  # noqa: PLC2701
 )
 from graphix.fundamentals import ANGLE_PI, ParameterizedAngle, Plane
 from graphix.instruction import InstructionKind
@@ -225,10 +225,7 @@ def decompose_ry(instr: instruction.RY) -> list[J]:
         the decomposition.
 
     """
-    return [
-        J(target=instr.target, angle=angle)
-        for angle in reversed((0, ANGLE_PI / 2, instr.angle, -ANGLE_PI / 2))
-    ]
+    return [J(target=instr.target, angle=angle) for angle in reversed((0, ANGLE_PI / 2, instr.angle, -ANGLE_PI / 2))]
 
 
 def decompose_rz(instr: instruction.RZ) -> list[J]:
@@ -325,9 +322,7 @@ class CircuitWithMeasurementError(Exception):
 
     def __init__(self) -> None:
         """Build the exception."""
-        super().__init__(
-            "Circuits containing measurements are not supported by the transpiler."
-        )
+        super().__init__("Circuits containing measurements are not supported by the transpiler.")
 
 
 class InternalInstructionError(Exception):
@@ -338,9 +333,7 @@ class InternalInstructionError(Exception):
         super().__init__(f"Internal instruction: {instr}")
 
 
-def j_commands(
-    current_node: int, next_node: int, angle: ParameterizedAngle
-) -> list[command.Command]:
+def j_commands(current_node: int, next_node: int, angle: ParameterizedAngle) -> list[command.Command]:
     """Return the MBQC pattern commands for a J gate.
 
     Args:
@@ -388,9 +381,8 @@ def transpile_jcz(circuit: Circuit) -> TranspileResult:
             if target is None:
                 raise IllformedCircuitError
             measurement = _measurement_of_axis(instr.axis)
-            classical_outputs[target] = command.M(
-                node=target, plane=measurement.plane, angle=measurement.angle
-            )
+            classical_outputs[target] = command.M(node=target, plane=measurement.plane, angle=measurement.angle)
+            indices[instr.target] = None
             continue
         for instr_jcz in instruction_to_jcz(instr):
             if instr_jcz.kind == JCZInstructionKind.J:
@@ -447,14 +439,12 @@ def circuit_to_causal_flow(
     x_corrections: dict[int, AbstractSet[int]] = {}
     for instr in circuit.instruction:
         if instr.kind == InstructionKind.M:
-            # raise CircuitWithMeasurementError
             target = indices[instr.target]
             if target is None:
                 raise IllformedCircuitError
             measurement = _measurement_of_axis(instr.axis)
-            classical_outputs[target] = command.M(
-                node=target, plane=measurement.plane, angle=measurement.angle
-            )
+            classical_outputs[target] = command.M(node=target, plane=measurement.plane, angle=measurement.angle)
+            indices[instr.target] = None
             continue
         for instr_jcz in instruction_to_jcz(instr):
             if instr_jcz.kind == JCZInstructionKind.J:
@@ -480,6 +470,7 @@ def circuit_to_causal_flow(
                 continue
             assert_never(instr_jcz.kind)
     outputs = [i for i in indices if i is not None]
+    outputs.extend(classical_outputs.keys())
     og = OpenGraph(
         graph=graph,
         input_nodes=tuple(inputs),
@@ -492,9 +483,7 @@ def circuit_to_causal_flow(
         z_targets = set(graph.neighbors(corrector)) - {node}
         if z_targets:
             z_corrections[node] = z_targets
-    partial_order_layers = _corrections_to_partial_order_layers(
-        og, x_corrections, z_corrections
-    )
+    partial_order_layers = _corrections_to_partial_order_layers(og, x_corrections, z_corrections)
     return CausalFlow(og, x_corrections, partial_order_layers), classical_outputs
 
 

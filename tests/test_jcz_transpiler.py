@@ -16,13 +16,13 @@ from graphix.random_objects import rand_circuit
 from graphix.sim.statevec import Statevec
 from graphix.simulator import DefaultMeasureMethod
 from graphix.transpiler import Circuit
+from numpy.random import PCG64, Generator
 
 from graphix_jcz_transpiler import (
     circuit_to_causal_flow,
     transpile_jcz,
     transpile_jcz_cf,
 )
-from tests.conftest import PCG64, Generator  # ignore[attr-defined]
 
 logger = logging.getLogger(__name__)
 

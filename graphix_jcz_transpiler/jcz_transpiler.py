@@ -9,7 +9,7 @@ import dataclasses
 import enum
 from dataclasses import dataclass
 from enum import Enum
-from typing import TYPE_CHECKING, ClassVar, Literal
+from typing import TYPE_CHECKING, ClassVar, Literal, TypeAlias
 
 import networkx as nx
 from graphix import Pattern, command, instruction
@@ -26,7 +26,7 @@ from graphix.transpiler import (
     TranspileResult,
     _measurement_of_axis,  # noqa: PLC2701
 )
-from typing_extensions import TypeAlias, assert_never
+from typing_extensions import assert_never
 
 if TYPE_CHECKING:
     from collections.abc import Iterable, Sequence

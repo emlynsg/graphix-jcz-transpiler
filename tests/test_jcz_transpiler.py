@@ -12,6 +12,7 @@ import pytest
 from graphix import Pattern, instruction
 from graphix.branch_selector import ConstBranchSelector
 from graphix.fundamentals import ANGLE_PI, Axis
+from graphix.measurements import BlochMeasurement, Measurement
 from graphix.random_objects import rand_circuit
 from graphix.sim.statevec import Statevec
 from graphix.simulator import DefaultMeasureMethod
@@ -23,6 +24,7 @@ from graphix_jcz_transpiler import (
     transpile_jcz,
     transpile_jcz_cf,
 )
+from graphix_jcz_transpiler.jcz_transpiler import normalize_angle
 
 logger = logging.getLogger(__name__)
 
@@ -46,6 +48,7 @@ TEST_BASIC_CIRCUITS = [
 def patterns_match(pattern1: Pattern, pattern2: Pattern) -> bool:
     unmatched_p1 = [x for x in pattern1 if x not in pattern2]
     unmatched_p2 = [x for x in pattern2 if x not in pattern1]
+    print(unmatched_p1, unmatched_p2)
     return len(unmatched_p1) == 0 and len(unmatched_p2) == 0
 
 
@@ -53,7 +56,7 @@ def patterns_match(pattern1: Pattern, pattern2: Pattern) -> bool:
 def test_circuit_simulation(circuit: Circuit, fx_rng: Generator) -> None:
     """Test circuit transpilation simulation matches direct simulation of the circuit."""
     pattern = transpile_jcz(circuit).pattern
-    pattern.standardize()
+    pattern = pattern.infer_pauli_measurements()
     pattern.remove_input_nodes()
     pattern.perform_pauli_measurements()
     state = circuit.simulate_statevector().statevec
@@ -83,7 +86,9 @@ def test_measure(fx_rng: Generator, axis: Axis) -> None:
     circuit.cnot(0, 1)
     circuit.m(0, axis)
     transpiled = transpile_jcz(circuit)
-    transpiled.pattern.standardize()
+    # Inferring Pauli measurements simulates the measurement on node 0!
+    # transpiled.pattern = transpiled.pattern.infer_pauli_measurements()
+    transpiled.pattern.remove_input_nodes()
 
     def simulate_and_measure() -> int:
         measure_method = DefaultMeasureMethod(results=transpiled.pattern.results)
@@ -109,7 +114,7 @@ def test_circuit_simulation_cf(circuit: Circuit) -> None:
     """Test causal flow transpilation simulation matches direct simulation of the circuit."""
     bs = ConstBranchSelector(0)
     pattern = transpile_jcz_cf(circuit).pattern
-    pattern.standardize()
+    pattern = pattern.infer_pauli_measurements()
     pattern.remove_input_nodes()
     pattern.perform_pauli_measurements()
     state = circuit.simulate_statevector().statevec
@@ -130,12 +135,10 @@ def test_circuit_flow_cf(circuit: Circuit) -> None:
 def test_circuit_simulation_compare_direct(circuit: Circuit) -> None:
     """Test comparing direct to causal flow transpilation."""
     bs = ConstBranchSelector(0)
-    pattern = transpile_jcz(circuit).pattern
-    pattern_cf = transpile_jcz_cf(circuit).pattern
-    pattern.standardize()
+    pattern = transpile_jcz(circuit).pattern.infer_pauli_measurements()
+    pattern_cf = transpile_jcz_cf(circuit).pattern.infer_pauli_measurements()
     pattern.remove_input_nodes()
     pattern.perform_pauli_measurements()
-    pattern_cf.standardize()
     pattern_cf.remove_input_nodes()
     pattern_cf.perform_pauli_measurements()
     assert patterns_match(pattern, pattern_cf)
@@ -148,12 +151,10 @@ def test_circuit_simulation_compare_direct(circuit: Circuit) -> None:
 def test_circuit_simulation_compare_graphix(circuit: Circuit) -> None:
     """Test comparing Graphix main transpiler pattern simulation to causal flow transpilation."""
     bs = ConstBranchSelector(0)
-    pattern = circuit.transpile().pattern
-    pattern_cf = transpile_jcz_cf(circuit).pattern
-    pattern.standardize()
+    pattern = circuit.transpile().pattern.infer_pauli_measurements()
+    pattern_cf = transpile_jcz_cf(circuit).pattern.infer_pauli_measurements()
     pattern.remove_input_nodes()
     pattern.perform_pauli_measurements()
-    pattern_cf.standardize()
     pattern_cf.remove_input_nodes()
     pattern_cf.perform_pauli_measurements()
     state_mbqc = pattern.simulate_pattern(branch_selector=bs)
@@ -169,16 +170,13 @@ def test_random_circuit_compare(fx_bg: PCG64, jumps: int) -> None:
     nqubits = 3
     depth = 2
     circuit = rand_circuit(nqubits, depth, rng, use_ccx=True)
-    pattern = transpile_jcz(circuit).pattern
-    pattern.standardize()
+    pattern = transpile_jcz(circuit).pattern.infer_pauli_measurements()
     pattern.remove_input_nodes()
     pattern.perform_pauli_measurements()
-    pattern_og = transpile_jcz_cf(circuit).pattern
-    pattern_og.standardize()
+    pattern_og = transpile_jcz_cf(circuit).pattern.infer_pauli_measurements()
     pattern_og.remove_input_nodes()
     pattern_og.perform_pauli_measurements()
-    pattern_gpx = circuit.transpile().pattern
-    pattern_gpx.standardize()
+    pattern_gpx = circuit.transpile().pattern.infer_pauli_measurements()
     pattern_gpx.remove_input_nodes()
     pattern_gpx.perform_pauli_measurements()
     state = pattern.simulate_pattern(backend="tensornetwork", branch_selector=bs)
@@ -207,16 +205,13 @@ def test_random_circuit_with_m(fx_bg: PCG64, jumps: int) -> None:
     depth = 2
     circuit = rand_circuit(nqubits, depth, rng, use_ccx=True)
     circuit.m(1, Axis.Y)
-    pattern = transpile_jcz(circuit).pattern
-    pattern.standardize()
+    pattern = transpile_jcz(circuit).pattern.infer_pauli_measurements()
     pattern.remove_input_nodes()
     pattern.perform_pauli_measurements()
-    pattern_og = transpile_jcz_cf(circuit).pattern
-    pattern_og.standardize()
+    pattern_og = transpile_jcz_cf(circuit).pattern.infer_pauli_measurements()
     pattern_og.remove_input_nodes()
     pattern_og.perform_pauli_measurements()
-    pattern_gpx = circuit.transpile().pattern
-    pattern_gpx.standardize()
+    pattern_gpx = circuit.transpile().pattern.infer_pauli_measurements()
     pattern_gpx.remove_input_nodes()
     pattern_gpx.perform_pauli_measurements()
     state = pattern.simulate_pattern(backend="tensornetwork", branch_selector=bs)
@@ -236,18 +231,24 @@ def test_random_circuit_with_m(fx_bg: PCG64, jumps: int) -> None:
     ) == pytest.approx(1)
 
 
+def normalize_measurement(m: Measurement) -> Measurement:
+    if isinstance(m, BlochMeasurement):
+        return BlochMeasurement(normalize_angle(m.angle), m.plane)
+    return m
+
+
 def test_circuit_compare_with_m_early() -> None:
     bs = ConstBranchSelector(0)
     circuit = Circuit(3)
     circuit.m(0, Axis.Y)
     circuit.ry(1, ANGLE_PI / 5)
     circuit.cnot(1, 2)
-    pattern_gpx = circuit.transpile().pattern
+    pattern_gpx = circuit.transpile().pattern.to_bloch().map(normalize_measurement)
     pattern_gpx.standardize()
-    pattern = transpile_jcz(circuit).pattern
+    pattern = transpile_jcz(circuit).pattern.to_bloch()
     pattern.standardize()
     state = pattern.simulate_pattern(branch_selector=bs)
-    pattern_og = transpile_jcz_cf(circuit).pattern
+    pattern_og = transpile_jcz_cf(circuit).pattern.to_bloch()
     pattern_og.standardize()
     assert patterns_match(pattern, pattern_og)
     assert patterns_match(pattern_gpx, pattern_og)
@@ -263,11 +264,11 @@ def test_circuit_compare_with_m_end() -> None:
     circuit.cz(0, 1)
     circuit.rz(1, ANGLE_PI / 5)
     circuit.m(0, Axis.Z)
-    pattern_gpx = circuit.transpile().pattern
+    pattern_gpx = circuit.transpile().pattern.to_bloch().map(normalize_measurement)
     pattern_gpx.standardize()
-    pattern = transpile_jcz(circuit).pattern
+    pattern = transpile_jcz(circuit).pattern.to_bloch()
     pattern.standardize()
-    pattern_og = transpile_jcz_cf(circuit).pattern
+    pattern_og = transpile_jcz_cf(circuit).pattern.to_bloch()
     pattern_og.standardize()
     state = pattern.simulate_pattern(branch_selector=bs)
     state_og = pattern_og.simulate_pattern(branch_selector=bs)
@@ -281,9 +282,9 @@ def test_circuit_compare_with_m_end() -> None:
 @pytest.mark.parametrize("circuit", TEST_BASIC_CIRCUITS)
 def test_pauli_presimulation_sizes_match(circuit: Circuit) -> None:
     """Test causal flow transpilation simulation matches direct simulation of the circuit."""
-    pattern = transpile_jcz(circuit).pattern
-    pattern_cf = transpile_jcz_cf(circuit).pattern
-    pattern_gpx = circuit.transpile().pattern
+    pattern = transpile_jcz(circuit).pattern.infer_pauli_measurements()
+    pattern_cf = transpile_jcz_cf(circuit).pattern.infer_pauli_measurements()
+    pattern_gpx = circuit.transpile().pattern.infer_pauli_measurements()
     print("Circuit: ", circuit, "\n")
     print(
         "Nodes before PP: {JCZ: ",
@@ -294,13 +295,10 @@ def test_pauli_presimulation_sizes_match(circuit: Circuit) -> None:
         pattern_gpx.n_node,
         "}\n",
     )
-    pattern.standardize()
     pattern.remove_input_nodes()
     pattern.perform_pauli_measurements()
-    pattern_cf.standardize()
     pattern_cf.remove_input_nodes()
     pattern_cf.perform_pauli_measurements()
-    pattern_gpx.standardize()
     pattern_gpx.remove_input_nodes()
     pattern_gpx.perform_pauli_measurements()
     print(

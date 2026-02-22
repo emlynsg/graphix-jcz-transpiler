@@ -17,14 +17,13 @@ from graphix.flow.core import (
     CausalFlow,
     _corrections_to_partial_order_layers,  # noqa: PLC2701
 )
-from graphix.fundamentals import ANGLE_PI, ParameterizedAngle, Plane
+from graphix.fundamentals import ANGLE_PI, ParameterizedAngle
 from graphix.instruction import InstructionKind
-from graphix.measurements import Measurement
+from graphix.measurements import BlochMeasurement, Measurement, PauliMeasurement
 from graphix.opengraph import OpenGraph
 from graphix.transpiler import (
     Circuit,
     TranspileResult,
-    _measurement_of_axis,  # noqa: PLC2701
 )
 from typing_extensions import assert_never
 
@@ -350,9 +349,28 @@ def j_commands(current_node: int, next_node: int, angle: ParameterizedAngle) -> 
     return [
         command.N(node=next_node),
         command.E(nodes=(current_node, next_node)),
-        command.M(node=current_node, angle=(angle) + 0.0),  # Avoids -0.0
+        command.M(current_node, Measurement.XY(angle)),
         command.X(node=next_node, domain={current_node}),
     ]
+
+
+def normalize_angle(angle: ParameterizedAngle) -> ParameterizedAngle:
+    r"""Return an equivalent angle in range :math:`[0, 2 \cdot \pi)` if ``angle`` is instantiated.
+
+    Parameters
+    ----------
+    angle: ParameterizedAngle
+        An angle.
+
+    Returns
+    -------
+    ParameterizedAngle
+        An equivalent angle in range :math:`[0, 2 \cdot \pi)` if ``angle`` is instantiated.
+        If ``angle`` is parameterized, ``angle`` is returned unchanged.
+    """
+    if isinstance(angle, float):
+        return angle % (2 * ANGLE_PI)
+    return angle
 
 
 def transpile_jcz(circuit: Circuit) -> TranspileResult:
@@ -380,8 +398,7 @@ def transpile_jcz(circuit: Circuit) -> TranspileResult:
             target = indices[instr.target]
             if target is None:
                 raise IllformedCircuitError
-            measurement = _measurement_of_axis(instr.axis)
-            classical_outputs[target] = command.M(node=target, plane=measurement.plane, angle=measurement.angle)
+            classical_outputs[target] = command.M(target, PauliMeasurement(instr.axis))
             indices[instr.target] = None
             continue
         for instr_jcz in instruction_to_jcz(instr):
@@ -391,7 +408,7 @@ def transpile_jcz(circuit: Circuit) -> TranspileResult:
                     raise IllformedCircuitError
                 ancilla = n_nodes
                 n_nodes += 1
-                pattern.extend(j_commands(target, ancilla, -instr_jcz.angle))
+                pattern.extend(j_commands(target, ancilla, normalize_angle(-instr_jcz.angle)))
                 indices[instr_jcz.target] = ancilla
                 continue
             if instr_jcz.kind == InstructionKind.CZ:
@@ -412,7 +429,7 @@ def transpile_jcz(circuit: Circuit) -> TranspileResult:
 
 def circuit_to_causal_flow(
     circuit: Circuit,
-) -> tuple[CausalFlow[Measurement], dict[int, command.M]]:
+) -> tuple[CausalFlow[BlochMeasurement], dict[int, command.M]]:
     """Transpile a circuit via a J-∧z-like decomposition to an open graph.
 
     Args:
@@ -431,7 +448,7 @@ def circuit_to_causal_flow(
     """
     indices: list[int | None] = list(range(circuit.width))
     n_nodes = circuit.width
-    measurements: dict[int, Measurement] = {}
+    measurements: dict[int, BlochMeasurement] = {}
     classical_outputs: dict[int, command.M] = {}
     inputs = list(range(n_nodes))
     graph: nx.Graph[int] = nx.Graph()
@@ -442,8 +459,7 @@ def circuit_to_causal_flow(
             target = indices[instr.target]
             if target is None:
                 raise IllformedCircuitError
-            measurement = _measurement_of_axis(instr.axis)
-            classical_outputs[target] = command.M(node=target, plane=measurement.plane, angle=measurement.angle)
+            classical_outputs[target] = command.M(target, PauliMeasurement(instr.axis))
             indices[instr.target] = None
             continue
         for instr_jcz in instruction_to_jcz(instr):
@@ -452,7 +468,7 @@ def circuit_to_causal_flow(
                 if target is None:
                     raise IllformedCircuitError
                 graph.add_edge(target, n_nodes)  # Also adds nodes
-                measurements[target] = Measurement(-instr_jcz.angle, plane=Plane.XY)
+                measurements[target] = Measurement.XY(normalize_angle(-instr_jcz.angle))
                 indices[instr_jcz.target] = n_nodes
                 x_corrections[target] = {n_nodes}  # X correction on ancilla
                 n_nodes += 1

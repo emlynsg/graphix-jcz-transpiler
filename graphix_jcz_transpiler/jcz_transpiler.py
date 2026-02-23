@@ -83,8 +83,8 @@ def decompose_ccx(
     Cambridge University Press, 2000
     (p. 182 in the 10th Anniversary Edition).
 
-    Args:
-    ----
+    Parameters
+    ----------
         instr: the CCX instruction to decompose.
 
     Returns
@@ -114,8 +114,8 @@ def decompose_ccx(
 def decompose_rzz(instr: instruction.RZZ) -> list[instruction.CNOT | instruction.RZ]:
     """Return a decomposition of RZZ(α) gate as CNOT(control, target)·Rz(target, α)·CNOT(control, target).
 
-    Args:
-    ----
+    Parameters
+    ----------
         instr: the RZZ instruction to decompose.
 
     Returns
@@ -135,8 +135,8 @@ def decompose_cnot(instr: instruction.CNOT) -> list[instruction.H | instruction.
 
     Vincent Danos, Elham Kashefi, Prakash Panangaden, The Measurement Calculus, 2007.
 
-    Args:
-    ----
+    Parameters
+    ----------
         instr: the CNOT instruction to decompose.
 
     Returns
@@ -159,8 +159,8 @@ def decompose_swap(instr: instruction.SWAP) -> list[instruction.CNOT]:
     Cambridge University Press, 2000
     (p. 23 in the 10th Anniversary Edition).
 
-    Args:
-    ----
+    Parameters
+    ----------
         instr: the SWAP instruction to decompose.
 
     Returns
@@ -178,8 +178,8 @@ def decompose_swap(instr: instruction.SWAP) -> list[instruction.CNOT]:
 def decompose_y(instr: instruction.Y) -> list[instruction.X | instruction.Z]:
     """Return a decomposition of the Y gate as X·Z.
 
-    Args:
-    ----
+    Parameters
+    ----------
         instr: the Y instruction to decompose.
 
     Returns
@@ -196,8 +196,8 @@ def decompose_rx(instr: instruction.RX) -> list[J]:
     The Rx(α) gate is decomposed into J(α)·H (that is to say, J(α)·J(0)).
     Vincent Danos, Elham Kashefi, Prakash Panangaden, The Measurement Calculus, 2007.
 
-    Args:
-    ----
+    Parameters
+    ----------
         instr: the RX instruction to decompose.
 
     Returns
@@ -215,8 +215,8 @@ def decompose_ry(instr: instruction.RY) -> list[J]:
     Vincent Danos, Elham Kashefi, Prakash Panangaden, Robust and parsimonious realisations of unitaries in the one-way
     model, 2004.
 
-    Args:
-    ----
+    Parameters
+    ----------
         instr: the RY instruction to decompose.
 
     Returns
@@ -233,8 +233,8 @@ def decompose_rz(instr: instruction.RZ) -> list[J]:
     The Rz(α) gate is decomposed into H·J(α) (that is to say, J(0)·J(α)).
     Vincent Danos, Elham Kashefi, Prakash Panangaden, The Measurement Calculus, 2007.
 
-    Args:
-    ----
+    Parameters
+    ----------
         instr: the RZ instruction to decompose.
 
     Returns
@@ -248,8 +248,8 @@ def decompose_rz(instr: instruction.RZ) -> list[J]:
 def instruction_to_jcz(instr: JCZInstruction) -> Sequence[J | instruction.CZ]:
     """Return a J-∧z decomposition of the instruction.
 
-    Args:
-    ----
+    Parameters
+    ----------
         instr: the instruction to decompose.
 
     Returns
@@ -296,8 +296,8 @@ def instruction_list_to_jcz(
 ) -> list[J | instruction.CZ]:
     """Return a J-∧z decomposition of the sequence of instructions.
 
-    Args:
-    ----
+    Parameters
+    ----------
         instrs: the instruction sequence to decompose.
 
     Returns
@@ -335,8 +335,8 @@ class InternalInstructionError(Exception):
 def j_commands(current_node: int, next_node: int, angle: ParameterizedAngle) -> list[command.Command]:
     """Return the MBQC pattern commands for a J gate.
 
-    Args:
-    ----
+    Parameters
+    ----------
         current_node: the current node.
         next_node: the next node.
         angle: the angle of the J gate.
@@ -376,8 +376,8 @@ def normalize_angle(angle: ParameterizedAngle) -> ParameterizedAngle:
 def transpile_jcz(circuit: Circuit) -> TranspileResult:
     """Transpile a circuit via a J-∧z decomposition.
 
-    Args:
-    ----
+    Parameters
+    ----------
         circuit: the circuit to transpile.
 
     Returns
@@ -391,7 +391,7 @@ def transpile_jcz(circuit: Circuit) -> TranspileResult:
     """
     n_nodes = circuit.width
     indices: list[int | None] = list(range(n_nodes))
-    pattern = Pattern(input_nodes=list(range(n_nodes)))
+    pattern = Pattern(input_nodes=range(n_nodes))
     classical_outputs: dict[int, command.M] = {}
     for instr in circuit.instruction:
         if instr.kind == InstructionKind.M:
@@ -419,11 +419,7 @@ def transpile_jcz(circuit: Circuit) -> TranspileResult:
                 pattern.extend([command.E(nodes=(i0, i1))])
                 continue
             assert_never(instr_jcz.kind)
-    # pattern = Pattern(
-    #     pattern.input_nodes, list(pattern), [i for i in indices if i is not None]
-    # )
     pattern.extend(classical_outputs.values())
-    # pattern.reorder_output_nodes([i for i in indices if i is not None])
     return TranspileResult(pattern, tuple(classical_outputs.keys()))
 
 
@@ -432,8 +428,8 @@ def circuit_to_causal_flow(
 ) -> tuple[CausalFlow[BlochMeasurement], dict[int, command.M]]:
     """Transpile a circuit via a J-∧z-like decomposition to an open graph.
 
-    Args:
-    ----
+    Parameters
+    ----------
         circuit: the circuit to transpile.
 
     Returns
@@ -506,8 +502,8 @@ def circuit_to_causal_flow(
 def transpile_jcz_cf(circuit: Circuit) -> TranspileResult:
     """Transpile a circuit via a J-∧z-like decomposition to a pattern.
 
-    Args:
-    ----
+    Parameters
+    ----------
         circuit: the circuit to transpile.
 
     Returns

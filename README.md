@@ -8,8 +8,16 @@ In the seminal paper [*The Measurement
 Calculus*](https://arxiv.org/abs/0704.1263) by Danos, Kashefi, and
 Panangaden (2007), circuit-to-pattern transpilation leverages the
 universality of the gate set consisting of 𝔍(α) and ∧Z. This package
-implements that transpilation mehtod in a straightforward and
+implements that transpilation method in a straightforward and
 principled way.
+
+The package allows for transpilation of circuits with the following steps:
+
+1. Convert circuit, defined by gates available in Graphix, to a set of J and ∧z gates.
+
+2. Construct an open graph from the J and ∧z gates.
+
+3. Find a flow for the open graph and convert it into a pattern.
 
 Compared to the existing transpilation procedure in Graphix, this
 implementation is more naive but also more transparent:

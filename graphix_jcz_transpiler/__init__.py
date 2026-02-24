@@ -3,6 +3,42 @@
 Copyright (C) 2025, QAT team (ENS-PSL, Inria, CNRS).
 """
 
-from graphix_jcz_transpiler.jcz_transpiler import transpile_jcz
+from __future__ import annotations
 
-__all__ = ["transpile_jcz"]
+from graphix_jcz_transpiler.jcz_transpiler import (
+    CircuitWithMeasurementError,
+    IllformedCircuitError,
+    InternalInstructionError,
+    J,
+    JCZInstructionKind,
+    circuit_to_causal_flow,
+    decompose_ccx,
+    decompose_rx,
+    decompose_ry,
+    decompose_rz,
+    decompose_rzz,
+    decompose_swap,
+    decompose_y,
+    j_commands,
+    transpile_jcz,
+    transpile_jcz_cf,
+)
+
+__all__ = [
+    "CircuitWithMeasurementError",
+    "IllformedCircuitError",
+    "InternalInstructionError",
+    "J",
+    "JCZInstructionKind",
+    "circuit_to_causal_flow",
+    "decompose_ccx",
+    "decompose_rx",
+    "decompose_ry",
+    "decompose_rz",
+    "decompose_rzz",
+    "decompose_swap",
+    "decompose_y",
+    "j_commands",
+    "transpile_jcz",
+    "transpile_jcz_cf",
+]

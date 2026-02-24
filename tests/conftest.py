@@ -3,6 +3,8 @@
 Copyright (C) 2025, QAT team (ENS-PSL, Inria, CNRS).
 """
 
+from __future__ import annotations
+
 import pytest
 from numpy.random import PCG64, Generator
 

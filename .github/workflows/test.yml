@@ -33,7 +33,10 @@ jobs:
         run: ruff format
 
       - name: Run mypy
-        run: mypy .
+        run: mypy
+
+      - name: Run pyright
+        run: pyright
 
       - name: Run pytest
         run: pytest

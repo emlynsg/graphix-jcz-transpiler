@@ -69,7 +69,7 @@ def test_check_circuit_flow(circuit: Circuit) -> None:
     """Test directly transpiled basic circuits have flow."""
     pattern = transpile_jcz(circuit).pattern
     og = pattern.extract_opengraph()
-    f = og.find_causal_flow()
+    f = og.to_bloch().find_causal_flow()
     assert f is not None
 
 

@@ -312,3 +312,16 @@ def test_pauli_presimulation_sizes_match(circuit: Circuit) -> None:
     )
     assert pattern.n_node == pattern_cf.n_node
     assert pattern.n_node == pattern_gpx.n_node
+
+def test_cz_ccx() -> None:
+    """https://github.com/qat-inria/graphix-jcz-transpiler/issues/2"""
+    circuit = Circuit(width=3)
+    circuit.cz(2, 0)
+    circuit.ccx(1, 0, 2)
+    ref_state = circuit.simulate_statevector().statevec
+    graphix_pattern = circuit.transpile().pattern
+    graphix_state = graphix_pattern.simulate_pattern()
+    assert graphix_state.isclose(ref_state)
+    jcz_pattern = transpile_jcz(circuit).pattern
+    jcz_state = jcz_pattern.simulate_pattern()
+    assert jcz_state.isclose(ref_state)

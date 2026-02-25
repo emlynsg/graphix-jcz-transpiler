@@ -1,5 +1,5 @@
 name: Test
-on: [push, workflow_dispatch]
+on: [pull_request, workflow_dispatch]
 
 permissions:
   contents: read
@@ -37,4 +37,3 @@ jobs:
 
       - name: Run pytest
         run: pytest
-        

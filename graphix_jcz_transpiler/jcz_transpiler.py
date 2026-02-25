@@ -421,6 +421,7 @@ def transpile_jcz(circuit: Circuit) -> TranspileResult:
                 continue
             assert_never(instr_jcz.kind)
     pattern.extend(classical_outputs.values())
+    pattern.reorder_output_nodes([node for node in indices if node is not None])
     return TranspileResult(pattern, tuple(classical_outputs.keys()))
 
 

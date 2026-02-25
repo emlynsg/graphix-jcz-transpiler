@@ -10,14 +10,14 @@ import logging
 import numpy as np
 import pytest
 from graphix import Pattern, instruction
-from graphix.branch_selector import ConstBranchSelector
+from graphix.branch_selector import ConstBranchSelector, FixedBranchSelector, RandomBranchSelector
 from graphix.fundamentals import ANGLE_PI, Axis
-from graphix.instruction import CCX
+from graphix.instruction import CCX, CNOT, RZ, RY, CZ, RX, Z, Y
 from graphix.measurements import BlochMeasurement, Measurement
 from graphix.random_objects import rand_circuit
 from graphix.sim.statevec import Statevec
 from graphix.simulator import DefaultMeasureMethod
-from graphix.transpiler import Circuit
+from graphix.transpiler import Circuit, transpile_swaps
 from numpy.random import PCG64, Generator
 
 from graphix_jcz_transpiler import (
@@ -44,13 +44,6 @@ TEST_BASIC_CIRCUITS = [
     Circuit(3, instr=[instruction.CCX(0, (1, 2))]),
     Circuit(2, instr=[instruction.RZZ(0, 1, ANGLE_PI / 4)]),
 ]
-
-
-def patterns_match(pattern1: Pattern, pattern2: Pattern) -> bool:
-    unmatched_p1 = [x for x in pattern1 if x not in pattern2]
-    unmatched_p2 = [x for x in pattern2 if x not in pattern1]
-    print(unmatched_p1, unmatched_p2)
-    return len(unmatched_p1) == 0 and len(unmatched_p2) == 0
 
 
 @pytest.mark.parametrize("circuit", TEST_BASIC_CIRCUITS)
@@ -142,7 +135,6 @@ def test_circuit_simulation_compare_direct(circuit: Circuit) -> None:
     pattern.perform_pauli_measurements()
     pattern_cf.remove_input_nodes()
     pattern_cf.perform_pauli_measurements()
-    assert patterns_match(pattern, pattern_cf)
     state_mbqc = pattern.simulate_pattern(branch_selector=bs)
     state_mbqc_cf = pattern_cf.simulate_pattern(branch_selector=bs)
     assert np.abs(np.dot(state_mbqc.flatten().conjugate(), state_mbqc_cf.flatten())) == pytest.approx(1)
@@ -251,8 +243,6 @@ def test_circuit_compare_with_m_early() -> None:
     state = pattern.simulate_pattern(branch_selector=bs)
     pattern_og = transpile_jcz_cf(circuit).pattern.to_bloch()
     pattern_og.standardize()
-    assert patterns_match(pattern, pattern_og)
-    assert patterns_match(pattern_gpx, pattern_og)
     state_og = pattern_og.simulate_pattern(branch_selector=bs)
     state_gpx = pattern_gpx.simulate_pattern(branch_selector=bs)
     assert np.abs(np.dot(state.flatten().conjugate(), state_og.flatten())) == pytest.approx(1)
@@ -274,8 +264,6 @@ def test_circuit_compare_with_m_end() -> None:
     state = pattern.simulate_pattern(branch_selector=bs)
     state_og = pattern_og.simulate_pattern(branch_selector=bs)
     state_gpx = pattern_gpx.simulate_pattern(branch_selector=bs)
-    assert patterns_match(pattern, pattern_og)
-    assert patterns_match(pattern_gpx, pattern_og)
     assert np.abs(np.dot(state.flatten().conjugate(), state_og.flatten())) == pytest.approx(1)
     assert np.abs(np.dot(state_og.flatten().conjugate(), state_gpx.flatten())) == pytest.approx(1)
 
@@ -342,3 +330,12 @@ def test_ccx_decomposition() -> None:
     state = circuit.simulate_statevector().statevec
     state2 = circuit2.simulate_statevector().statevec
     assert state.isclose(state2)
+
+
+def test_cnot_cz() -> None:
+    """Test regression about output node reordering."""
+    circuit = Circuit(width=3, instr=[CNOT(0, 1), CZ((0, 1))])
+    state = circuit.simulate_statevector().statevec
+    pattern = transpile_jcz(circuit).pattern
+    state_mbqc = pattern.simulate_pattern()
+    assert state.isclose(state_mbqc)

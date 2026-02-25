@@ -9,15 +9,15 @@ import logging
 
 import numpy as np
 import pytest
-from graphix import Pattern, instruction
-from graphix.branch_selector import ConstBranchSelector, FixedBranchSelector, RandomBranchSelector
+from graphix import instruction
+from graphix.branch_selector import ConstBranchSelector
 from graphix.fundamentals import ANGLE_PI, Axis
-from graphix.instruction import CCX, CNOT, RZ, RY, CZ, RX, Z, Y
+from graphix.instruction import CCX, CNOT, CZ
 from graphix.measurements import BlochMeasurement, Measurement
 from graphix.random_objects import rand_circuit
 from graphix.sim.statevec import Statevec
 from graphix.simulator import DefaultMeasureMethod
-from graphix.transpiler import Circuit, transpile_swaps
+from graphix.transpiler import Circuit
 from numpy.random import PCG64, Generator
 
 from graphix_jcz_transpiler import (

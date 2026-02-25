@@ -12,6 +12,7 @@ import pytest
 from graphix import Pattern, instruction
 from graphix.branch_selector import ConstBranchSelector
 from graphix.fundamentals import ANGLE_PI, Axis
+from graphix.instruction import CCX
 from graphix.measurements import BlochMeasurement, Measurement
 from graphix.random_objects import rand_circuit
 from graphix.sim.statevec import Statevec
@@ -24,7 +25,7 @@ from graphix_jcz_transpiler import (
     transpile_jcz,
     transpile_jcz_cf,
 )
-from graphix_jcz_transpiler.jcz_transpiler import normalize_angle
+from graphix_jcz_transpiler.jcz_transpiler import decompose_ccx, normalize_angle
 
 logger = logging.getLogger(__name__)
 
@@ -321,7 +322,7 @@ def test_cz_ccx() -> None:
     """
     circuit = Circuit(width=3)
     circuit.cz(2, 0)
-    circuit.ccx(1, 0, 2)
+    circuit.ccx(0, 1, 2)
     ref_state = circuit.simulate_statevector().statevec
     graphix_pattern = circuit.transpile().pattern
     graphix_state = graphix_pattern.simulate_pattern()
@@ -329,3 +330,15 @@ def test_cz_ccx() -> None:
     jcz_pattern = transpile_jcz(circuit).pattern
     jcz_state = jcz_pattern.simulate_pattern()
     assert jcz_state.isclose(ref_state)
+
+
+def test_ccx_decomposition() -> None:
+    circuit = Circuit(width=3)
+    circuit.cz(2, 0)
+    circuit.ccx(0, 1, 2)
+    circuit2 = Circuit(width=3)
+    circuit2.cz(2, 0)
+    circuit2.extend(decompose_ccx(CCX(controls=(0, 1), target=2)))
+    state = circuit.simulate_statevector().statevec
+    state2 = circuit2.simulate_statevector().statevec
+    assert state.isclose(state2)

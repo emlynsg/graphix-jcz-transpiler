@@ -101,13 +101,14 @@ def decompose_ccx(
         instruction.CNOT(control=instr.controls[1], target=instr.target),
         instruction.RZ(instr.target, -ANGLE_PI / 4),
         instruction.CNOT(control=instr.controls[0], target=instr.target),
-        instruction.RZ(instr.controls[1], ANGLE_PI / 4),
+        instruction.RZ(instr.controls[1], -ANGLE_PI / 4),
         instruction.RZ(instr.target, ANGLE_PI / 4),
         instruction.CNOT(control=instr.controls[0], target=instr.controls[1]),
         instruction.H(instr.target),
-        instruction.RZ(instr.controls[0], ANGLE_PI / 4),
         instruction.RZ(instr.controls[1], -ANGLE_PI / 4),
         instruction.CNOT(control=instr.controls[0], target=instr.controls[1]),
+        instruction.RZ(instr.controls[0], ANGLE_PI / 4),
+        instruction.RZ(instr.controls[1], ANGLE_PI / 2),
     ]
 
 
@@ -420,6 +421,7 @@ def transpile_jcz(circuit: Circuit) -> TranspileResult:
                 continue
             assert_never(instr_jcz.kind)
     pattern.extend(classical_outputs.values())
+    pattern.reorder_output_nodes([node for node in indices if node is not None])
     return TranspileResult(pattern, tuple(classical_outputs.keys()))
 
 

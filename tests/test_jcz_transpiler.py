@@ -14,10 +14,11 @@ from graphix.branch_selector import ConstBranchSelector
 from graphix.fundamentals import ANGLE_PI, Axis
 from graphix.instruction import CCX, CNOT, CZ
 from graphix.measurements import BlochMeasurement, Measurement
+from graphix.optimization import StandardizedPattern
 from graphix.random_objects import rand_circuit
 from graphix.sim.statevec import Statevec
 from graphix.simulator import DefaultMeasureMethod
-from graphix.transpiler import Circuit
+from graphix.transpiler import Circuit, transpile_swaps
 from numpy.random import PCG64, Generator
 
 from graphix_jcz_transpiler import (
@@ -162,24 +163,31 @@ def test_random_circuit_compare(fx_bg: PCG64, jumps: int) -> None:
     rng = Generator(fx_bg.jumped(jumps))
     nqubits = 3
     depth = 2
-    circuit = rand_circuit(nqubits, depth, rng, use_ccx=True)
-    pattern = transpile_jcz(circuit).pattern.infer_pauli_measurements()
-    pattern.remove_input_nodes()
-    pattern = pattern.infer_pauli_measurements()
-    pattern.perform_pauli_measurements()
-    pattern_og = transpile_jcz_cf(circuit).pattern.infer_pauli_measurements()
-    pattern_og.remove_input_nodes()
-    pattern_og = pattern_og.infer_pauli_measurements()
-    pattern_og.perform_pauli_measurements()
-    pattern_gpx = circuit.transpile().pattern.infer_pauli_measurements()
-    pattern_gpx.remove_input_nodes()
-    pattern_gpx = pattern_gpx.infer_pauli_measurements()
-    pattern_gpx.perform_pauli_measurements()
-    state = pattern.simulate_pattern(branch_selector=bs)
-    state_og = pattern_og.simulate_pattern(branch_selector=bs)
-    state_gpx = pattern_gpx.simulate_pattern(branch_selector=bs)
-    assert state.isclose(state_og)
-    assert state_og.isclose(state_gpx)
+    base_circuit = rand_circuit(nqubits, depth, rng, use_ccx=True)
+    base_circuit = transpile_swaps(base_circuit).circuit
+    for k in range(len(base_circuit.instruction) + 1):
+        circuit = Circuit(nqubits, base_circuit.instruction[:k])
+        print("Added gate", k, ":", circuit.instruction[-1] if circuit.instruction else "None")
+        pattern = transpile_jcz(circuit).pattern.infer_pauli_measurements()
+        pattern.remove_input_nodes()
+        pattern = pattern.infer_pauli_measurements()
+        pattern.perform_pauli_measurements()
+        pattern = StandardizedPattern.from_pattern(pattern).to_space_optimal_pattern()
+        pattern_og = transpile_jcz_cf(circuit).pattern.infer_pauli_measurements()
+        pattern_og.remove_input_nodes()
+        pattern_og = pattern_og.infer_pauli_measurements()
+        pattern_og.perform_pauli_measurements()
+        pattern_og = StandardizedPattern.from_pattern(pattern_og).to_space_optimal_pattern()
+        pattern_gpx = circuit.transpile().pattern.infer_pauli_measurements()
+        pattern_gpx.remove_input_nodes()
+        pattern_gpx = pattern_gpx.infer_pauli_measurements()
+        pattern_gpx.perform_pauli_measurements()
+        pattern_gpx = StandardizedPattern.from_pattern(pattern_gpx).to_space_optimal_pattern()
+        state = pattern.simulate_pattern(branch_selector=bs)
+        state_og = pattern_og.simulate_pattern(branch_selector=bs)
+        state_gpx = pattern_gpx.simulate_pattern(branch_selector=bs)
+        assert state.isclose(state_og)
+        assert state_og.isclose(state_gpx)
 
 
 @pytest.mark.parametrize("jumps", range(1, 11))
@@ -191,15 +199,19 @@ def test_random_circuit_with_m(fx_bg: PCG64, jumps: int) -> None:
     depth = 2
     circuit = rand_circuit(nqubits, depth, rng, use_ccx=True)
     circuit.m(1, Axis.Y)
+    circuit = transpile_swaps(circuit).circuit
     pattern = transpile_jcz(circuit).pattern.infer_pauli_measurements()
     pattern.remove_input_nodes()
     pattern.perform_pauli_measurements()
+    pattern = StandardizedPattern.from_pattern(pattern).to_space_optimal_pattern()
     pattern_og = transpile_jcz_cf(circuit).pattern.infer_pauli_measurements()
     pattern_og.remove_input_nodes()
     pattern_og.perform_pauli_measurements()
+    pattern_og = StandardizedPattern.from_pattern(pattern_og).to_space_optimal_pattern()
     pattern_gpx = circuit.transpile().pattern.infer_pauli_measurements()
     pattern_gpx.remove_input_nodes()
     pattern_gpx.perform_pauli_measurements()
+    pattern_gpx = StandardizedPattern.from_pattern(pattern_gpx).to_space_optimal_pattern()
     state = pattern.simulate_pattern(backend="tensornetwork", branch_selector=bs)
     state_og = pattern_og.simulate_pattern(backend="tensornetwork", branch_selector=bs)
     state_gpx = pattern_gpx.simulate_pattern(backend="tensornetwork", branch_selector=bs)

@@ -437,7 +437,7 @@ def circuit_to_causal_flow(
 
     Returns
     -------
-        a causal flow.
+        a causal flow, classical outputs, and output nodes.
 
     Raises
     ------
@@ -488,8 +488,8 @@ def circuit_to_causal_flow(
     outputs.extend(classical_outputs.keys())
     og = OpenGraph(
         graph=graph,
-        input_nodes=tuple(inputs),
-        output_nodes=tuple(outputs),
+        input_nodes=inputs,
+        output_nodes=outputs,
         measurements=measurements,
     )
     z_corrections: dict[int, AbstractSet[int]] = {}

@@ -167,27 +167,26 @@ def test_random_circuit_compare(fx_bg: PCG64, jumps: int) -> None:
     base_circuit = transpile_swaps(base_circuit).circuit
     for k in range(len(base_circuit.instruction) + 1):
         circuit = Circuit(nqubits, base_circuit.instruction[:k])
-        print("Added gate", k, ":", circuit.instruction[-1] if circuit.instruction else "None")
         pattern = transpile_jcz(circuit).pattern.infer_pauli_measurements()
         pattern.remove_input_nodes()
-        pattern = pattern.infer_pauli_measurements()
         pattern.perform_pauli_measurements()
         pattern = StandardizedPattern.from_pattern(pattern).to_space_optimal_pattern()
         pattern_og = transpile_jcz_cf(circuit).pattern.infer_pauli_measurements()
         pattern_og.remove_input_nodes()
-        pattern_og = pattern_og.infer_pauli_measurements()
         pattern_og.perform_pauli_measurements()
         pattern_og = StandardizedPattern.from_pattern(pattern_og).to_space_optimal_pattern()
         pattern_gpx = circuit.transpile().pattern.infer_pauli_measurements()
         pattern_gpx.remove_input_nodes()
-        pattern_gpx = pattern_gpx.infer_pauli_measurements()
         pattern_gpx.perform_pauli_measurements()
         pattern_gpx = StandardizedPattern.from_pattern(pattern_gpx).to_space_optimal_pattern()
         state = pattern.simulate_pattern(branch_selector=bs)
         state_og = pattern_og.simulate_pattern(branch_selector=bs)
         state_gpx = pattern_gpx.simulate_pattern(branch_selector=bs)
-        assert state.isclose(state_og)
-        assert state_og.isclose(state_gpx)
+        # assert state.isclose(state_og)
+        if not state.isclose(state_og):
+            pytest.fail("Circuit instruction " + str(k) + ": " + str(circuit.instruction[-1]))
+        if not state_og.isclose(state_gpx):
+            pytest.fail("Circuit instruction " + str(k) + ": " + str(circuit.instruction[-1]))
 
 
 @pytest.mark.parametrize("jumps", range(1, 11))

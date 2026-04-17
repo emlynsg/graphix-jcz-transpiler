@@ -168,15 +168,15 @@ def test_random_circuit_compare(fx_bg: PCG64, jumps: int) -> None:
     depth = 2
     circuit = rand_circuit(nqubits, depth, rng, use_ccx=True)
     circuit = transpile_swaps(circuit).circuit
-    pattern = transpile_jcz(circuit).pattern
+    pattern = transpile_jcz(circuit).pattern.infer_pauli_measurements()
     pattern.remove_input_nodes()
     pattern.perform_pauli_measurements()
     pattern = StandardizedPattern.from_pattern(pattern).to_space_optimal_pattern()
-    pattern_og = transpile_jcz_cf(circuit).pattern
+    pattern_og = transpile_jcz_cf(circuit).pattern.infer_pauli_measurements()
     pattern_og.remove_input_nodes()
     pattern_og.perform_pauli_measurements()
     pattern_og = StandardizedPattern.from_pattern(pattern_og).to_space_optimal_pattern()
-    pattern_gpx = circuit.transpile().pattern
+    pattern_gpx = circuit.transpile().pattern.infer_pauli_measurements()
     pattern_gpx.remove_input_nodes()
     pattern_gpx.perform_pauli_measurements()
     pattern_gpx = StandardizedPattern.from_pattern(pattern_gpx).to_space_optimal_pattern()
